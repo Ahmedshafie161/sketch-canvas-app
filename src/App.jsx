@@ -656,9 +656,9 @@ const SketchCanvas = () => {
   
   const handleObjectDoubleClick = (obj, e) => {
     e.stopPropagation();
-    
-    if (obj.type === 'text') {
-      const newText = prompt('Enter text:', obj.text);
+    // Allow editing text for text, rectangle, circle, triangle
+    if (['text', 'rectangle', 'circle', 'triangle'].includes(obj.type)) {
+      const newText = prompt('Enter text:', obj.text || '');
       if (newText !== null) {
         setCanvasObjects(canvasObjects.map(o => 
           o.id === obj.id ? { ...o, text: newText } : o
@@ -932,6 +932,10 @@ const SketchCanvas = () => {
               backgroundImage: obj.imageUrl ? `url(${obj.imageUrl})` : undefined,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'absolute',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -943,6 +947,16 @@ const SketchCanvas = () => {
             }}
             onDoubleClick={(e) => handleObjectDoubleClick(obj, e)}
           >
+            {obj.text && (
+              <div style={{
+                width: '100%',
+                textAlign: 'center',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                fontSize: '1rem',
+                wordBreak: 'break-word',
+                pointerEvents: 'none',
+              }}>{obj.text}</div>
+            )}
             {obj.imageUrl && obj.text && (
               <div style={{
                 position: 'absolute',
@@ -961,7 +975,6 @@ const SketchCanvas = () => {
             {renderResizeHandles()}
           </div>
         );
-      
       case 'circle':
         return (
           <div
@@ -970,6 +983,10 @@ const SketchCanvas = () => {
               ...commonStyle,
               borderRadius: '50%',
               backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'absolute',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -981,10 +998,19 @@ const SketchCanvas = () => {
             }}
             onDoubleClick={(e) => handleObjectDoubleClick(obj, e)}
           >
+            {obj.text && (
+              <div style={{
+                width: '100%',
+                textAlign: 'center',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                fontSize: '1rem',
+                wordBreak: 'break-word',
+                pointerEvents: 'none',
+              }}>{obj.text}</div>
+            )}
             {renderResizeHandles()}
           </div>
         );
-      
       case 'triangle':
         return (
           <div
@@ -998,6 +1024,10 @@ const SketchCanvas = () => {
               width: 0,
               height: 0,
               border: isSelected ? '2px solid #3b82f6' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'absolute',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -1009,6 +1039,16 @@ const SketchCanvas = () => {
             }}
             onDoubleClick={(e) => handleObjectDoubleClick(obj, e)}
           >
+            {obj.text && (
+              <div style={{
+                width: '100%',
+                textAlign: 'center',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                fontSize: '1rem',
+                wordBreak: 'break-word',
+                pointerEvents: 'none',
+              }}>{obj.text}</div>
+            )}
             {renderResizeHandles()}
           </div>
         );
@@ -1345,6 +1385,34 @@ const SketchCanvas = () => {
               {expandedFolders.has(folder.id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               <FolderPlus size={16} />
               <span style={{ flex: 1, fontSize: '0.9rem' }}>{folder.name}</span>
+              {/* Add subfolder icon */}
+              <button
+                title="Add subfolder"
+                onClick={e => { e.stopPropagation(); createFolder(folder.id); }}
+                style={{
+                  padding: '0.25rem',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#22c55e',
+                }}
+              >
+                <FolderPlus size={14} />
+              </button>
+              {/* Add note icon */}
+              <button
+                title="Add note"
+                onClick={e => { e.stopPropagation(); createFile(folder.id); }}
+                style={{
+                  padding: '0.25rem',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#3b82f6',
+                }}
+              >
+                <File size={14} />
+              </button>
               <button
                 onClick={(e) => deleteFolder(folder.id, e)}
                 style={{
@@ -1358,7 +1426,6 @@ const SketchCanvas = () => {
                 <Trash2 size={14} />
               </button>
             </div>
-            
             {expandedFolders.has(folder.id) && renderFileTree(folder.id, level + 1)}
           </div>
         ))}
