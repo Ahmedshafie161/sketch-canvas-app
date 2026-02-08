@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { getCanvasCoords, isPointInObject, getResizeHandle } from '../utils/canvasUtils';
 
+export default function useCanvasMouseHandlers({
   canvasRef,
   canvasObjects,
   setCanvasObjects,
