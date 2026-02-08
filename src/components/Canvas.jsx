@@ -148,21 +148,27 @@ const Canvas = ({
         </defs>
       </svg>
       
-      {canvasObjects.map(obj => (
-        <CanvasObject
-          key={obj.id}
-          obj={obj}
-          isSelected={selectedObject?.id === obj.id}
-          selectedTool={selectedTool}
-          darkMode={darkMode}
-          canvasScale={canvasScale}
-          handleObjectDoubleClick={handleObjectDoubleClick}
-          handleConnect={handleConnect}
-          setSelectedObject={setSelectedObject}
-          handleContextMenu={handleContextMenu}
-          renderResizeHandles={renderResizeHandles}
-        />
-      ))}
+      // Update Canvas.jsx render section:
+{canvasObjects.map(obj => (
+  <CanvasObject
+    key={obj.id}
+    obj={obj}
+    isSelected={selectedObject?.id === obj.id}
+    selectedTool={selectedTool}
+    darkMode={darkMode}
+    canvasScale={canvasScale}
+    handleObjectDoubleClick={handleObjectDoubleClick}
+    handleConnect={handleConnect}
+    setSelectedObject={setSelectedObject}
+    handleContextMenu={handleContextMenu}
+    handleCellMediaMenu={handleCellMediaMenu}
+    handleCellEdit={handleCellEdit}
+    handleCellResize={handleCellResize}
+    editingCell={editingCell}
+    setEditingCell={setEditingCell}
+    renderResizeHandles={renderResizeHandles}
+  />
+))}
       
       {isDrawing && drawingPath.length > 0 && (
         <svg
