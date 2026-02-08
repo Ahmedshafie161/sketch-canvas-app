@@ -40,7 +40,86 @@ const SketchCanvas = () => {
   const [drawingHistory, setDrawingHistory] = useState([]);
   const [isConvertingDrawing, setIsConvertingDrawing] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState(null);
+  const [canvasScale, setCanvasScale] = useState(1);
   
+  useEffect(() => {
+  const handleWheel = (e) => {
+    if (!canvasRef.current) return;
+    
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const rect = canvasRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const zoomIntensity = 0.1;
+      const delta = e.deltaY > 0 ? -zoomIntensity : zoomIntensity;
+      const newScale = Math.min(Math.max(0.1, canvasScale + delta), 5);
+      
+      // Calculate new offset to zoom towards mouse position
+      const scaleRatio = newScale / canvasScale;
+      setCanvasOffset(prev => ({
+        x: prev.x - (mouseX / newScale) * (1 - scaleRatio),
+        y: prev.y - (mouseY / newScale) * (1 - scaleRatio)
+      }));
+      
+      setCanvasScale(newScale);
+    }
+  };
+  
+  const canvas = canvasRef.current;
+  if (canvas) {
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }
+}, [canvasScale, canvasOffset]);
+
+useEffect(() => {
+  const handleKeyDown = (e) => {
+    // Space for panning
+    if (e.code === 'Space') {
+      document.body.style.cursor = 'grab';
+    }
+    
+    // Arrow keys for navigation
+    if (e.code.startsWith('Arrow')) {
+      e.preventDefault();
+      const step = 50 / canvasScale;
+      switch(e.code) {
+        case 'ArrowUp':
+          setCanvasOffset(prev => ({ ...prev, y: prev.y - step }));
+          break;
+        case 'ArrowDown':
+          setCanvasOffset(prev => ({ ...prev, y: prev.y + step }));
+          break;
+        case 'ArrowLeft':
+          setCanvasOffset(prev => ({ ...prev, x: prev.x - step }));
+          break;
+        case 'ArrowRight':
+          setCanvasOffset(prev => ({ ...prev, x: prev.x + step }));
+          break;
+      }
+    }
+  };
+  
+  const handleKeyUp = (e) => {
+    if (e.code === 'Space') {
+      document.body.style.cursor = '';
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+  };
+}, [canvasScale]);
+
   useEffect(() => {
     const savedAuth = localStorage.getItem('canvasAuth');
     if (savedAuth) {
@@ -265,24 +344,44 @@ const SketchCanvas = () => {
   };
   
   const getCanvasCoords = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    let x, y;
-    
-    if (e.touches) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    }
-    
-    return { x, y };
-  };
+  const rect = canvasRef.current.getBoundingClientRect();
+  let x, y;
+  
+  if (e.touches) {
+    x = e.touches[0].clientX - rect.left;
+    y = e.touches[0].clientY - rect.top;
+  } else {
+    x = e.clientX - rect.left;
+    y = e.clientY - rect.top;
+  }
+  
+  // Apply scale and offset
+  x = (x / canvasScale) - canvasOffset.x;
+  y = (y / canvasScale) - canvasOffset.y;
+  
+  return { x, y };
+};
   
   const handleCanvasMouseDown = (e) => {
+     if (!currentFile) return;
+  
+  const pos = getCanvasCoords(e);
+  
+  // Handle panning
+  if (isPanning && panStart) {
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    
+    setCanvasOffset(prev => ({
+      x: prev.x + dx / canvasScale,
+      y: prev.y + dy / canvasScale
+    }));
+    
+    setPanStart({ x: e.clientX, y: e.clientY });
+    return;
+  }
     if (!currentFile) return;
     
-    const pos = getCanvasCoords(e);
     
     if (selectedTool === 'draw') {
       setIsDrawing(true);
@@ -395,6 +494,13 @@ const SketchCanvas = () => {
     if (!currentFile) return;
     
     const pos = getCanvasCoords(e);
+  
+  // Stop panning
+  if (isPanning) {
+    setIsPanning(false);
+    setPanStart(null);
+    return;
+  }
     
     if (isDrawing && selectedTool === 'draw' && drawingPath.length > 0) {
       const newObject = {
@@ -887,16 +993,19 @@ const SketchCanvas = () => {
   
   const renderObject = (obj) => {
     const isSelected = selectedObject?.id === obj.id;
-    const commonStyle = {
-      position: 'absolute',
-      left: obj.x,
-      top: obj.y,
-      width: obj.width,
-      height: obj.height,
-      border: isSelected ? '2px solid #3b82f6' : '2px solid ' + (darkMode ? '#475569' : '#94a3b8'),
-      cursor: selectedTool === 'select' ? 'move' : 'default',
-      transition: 'border-color 0.2s',
-    };
+  const commonStyle = {
+    position: 'absolute',
+    left: obj.x,
+    top: obj.y,
+    width: obj.width,
+    height: obj.height,
+    border: isSelected ? '2px solid #3b82f6' : '2px solid ' + (darkMode ? '#475569' : '#94a3b8'),
+    cursor: selectedTool === 'select' ? 'move' : 'default',
+    transition: 'border-color 0.2s',
+    transform: `scale(${1 / canvasScale})`, // Counter-scale objects
+    transformOrigin: '0 0',
+  };
+  
     
     const renderResizeHandles = () => {
       if (!isSelected) return null;
