@@ -15,12 +15,11 @@ import CellMediaMenu from './components/ui/CellMediaMenu';
 import useAuth from './components/hooks/useAuth';
 import useFolders from './components/hooks/useFolders';
 import useCanvas from './components/hooks/useCanvas';
-import useUI from './components/hooks/useUI';
-import useCanvasRefs from './components/hooks/useCanvasRefs';
+// Removed useUI and useCanvasRefs (state will be in parent)
 import useCanvasMouseHandlers from './hooks/useCanvasMouseHandlers';
 import useAppEffects from './components/hooks/useAppEffects';
 import useCanvasUIHandlers from './hooks/useCanvasUIHandlers';
-import useAppState from './hooks/useAppState';
+// Removed useAppState (state will be in parent)
 import useTableHandlers from './hooks/useTableHandlers';
 import useCanvasHandlers from './hooks/useCanvasHandlers';
 import Toolbar from './components/ui/Toolbar';
@@ -47,6 +46,23 @@ const SketchCanvas = () => {
   const [connectingFrom, setConnectingFrom] = React.useState(null);
   const [animations, setAnimations] = React.useState([]);
   const [isPlaying, setIsPlaying] = React.useState(false);
+  // All state is now in parent
+  const [darkMode, setDarkMode] = React.useState(false);
+  const [backgroundPattern, setBackgroundPattern] = React.useState('grid');
+  const [showTableEditor, setShowTableEditor] = React.useState(null);
+  const [resizingObject, setResizingObject] = React.useState(null);
+  const [resizeHandle, setResizeHandle] = React.useState(null);
+  const [editingCell, setEditingCell] = React.useState(null);
+  const [cellMediaMenu, setCellMediaMenu] = React.useState(null);
+  const [contextMenu, setContextMenu] = React.useState(null);
+  const [canvasOffset, setCanvasOffset] = React.useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = React.useState(false);
+  const [panStart, setPanStart] = React.useState(null);
+  const [canvasScale, setCanvasScale] = React.useState(1);
+  const [dragStart, setDragStart] = React.useState(null);
+  const [isDraggingObject, setIsDraggingObject] = React.useState(false);
+  const canvasRef = React.useRef(null);
+
   const auth = useAuth(setCurrentUser, setIsAuthenticated);
   const foldersState = useFolders({
     folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders,
@@ -58,12 +74,6 @@ const SketchCanvas = () => {
     isDrawing, setIsDrawing, drawingPath, setDrawingPath, connections, setConnections,
     connectingFrom, setConnectingFrom, animations, setAnimations, isPlaying, setIsPlaying
   });
-  const ui = useUI();
-  const { darkMode, setDarkMode, backgroundPattern, setBackgroundPattern, showTableEditor, setShowTableEditor, resizingObject, setResizingObject, resizeHandle, setResizeHandle, editingCell, setEditingCell, cellMediaMenu, setCellMediaMenu } = ui;
-  const appState = useAppState();
-  const { contextMenu, setContextMenu, canvasOffset, setCanvasOffset, isPanning, setIsPanning, panStart, setPanStart, canvasScale, setCanvasScale } = appState;
-  const canvasRefs = useCanvasRefs();
-  const { canvasRef } = canvasRefs;
 
   // Handlers
   const { handleConnect, deleteSelected } = useCanvasHandlers({ connectingFrom, setConnectingFrom, setConnections, connections, setCanvasObjects, canvasObjects, selectedObject, setSelectedObject });
@@ -172,24 +182,24 @@ const SketchCanvas = () => {
     setDrawingPath,
     setConnectingFrom,
     darkMode,
-    setResizingObject: ui.setResizingObject,
-    setResizeHandle: ui.setResizeHandle,
-    resizingObject: ui.resizingObject,
-    resizeHandle: ui.resizeHandle,
-    dragStart: canvasRefs.dragStart,
-    setDragStart: canvasRefs.setDragStart,
-    isDraggingObject: canvasRefs.isDraggingObject,
-    setIsDraggingObject: canvasRefs.setIsDraggingObject,
-    canvasScale: appState.canvasScale,
-    canvasOffset: appState.canvasOffset,
-    isPanning: appState.isPanning,
-    setIsPanning: appState.setIsPanning,
-    panStart: appState.panStart,
-    setPanStart: appState.setPanStart,
+    setResizingObject,
+    setResizeHandle,
+    resizingObject,
+    resizeHandle,
+    dragStart,
+    setDragStart,
+    isDraggingObject,
+    setIsDraggingObject,
+    canvasScale,
+    canvasOffset,
+    isPanning,
+    setIsPanning,
+    panStart,
+    setPanStart,
     currentFile,
-    setShowTableEditor: ui.setShowTableEditor,
-    setContextMenu: appState.setContextMenu,
-    setCellMediaMenu: ui.setCellMediaMenu
+    setShowTableEditor,
+    setContextMenu,
+    setCellMediaMenu
   });
 
   return (
