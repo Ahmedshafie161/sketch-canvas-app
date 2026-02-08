@@ -123,9 +123,6 @@ const SketchCanvas = () => {
   };
   const saveCurrentFile = () => {};
   const importOneNote = () => {};
-  const handleCanvasMouseDown = () => {};
-  const handleCanvasMouseMove = () => {};
-  const handleCanvasMouseUp = () => {};
 
   // Effects
   useAppEffects({
@@ -160,6 +157,40 @@ const SketchCanvas = () => {
   if (!isAuthenticated) {
     return <AuthForm {...auth} />;
   }
+
+  const canvasMouseHandlers = useCanvasMouseHandlers({
+    canvasRef,
+    canvasObjects,
+    setCanvasObjects,
+    selectedTool,
+    setSelectedTool,
+    selectedObject,
+    setSelectedObject,
+    isDrawing,
+    setIsDrawing,
+    drawingPath,
+    setDrawingPath,
+    setConnectingFrom,
+    darkMode,
+    setResizingObject: ui.setResizingObject,
+    setResizeHandle: ui.setResizeHandle,
+    resizingObject: ui.resizingObject,
+    resizeHandle: ui.resizeHandle,
+    dragStart: canvasRefs.dragStart,
+    setDragStart: canvasRefs.setDragStart,
+    isDraggingObject: canvasRefs.isDraggingObject,
+    setIsDraggingObject: canvasRefs.setIsDraggingObject,
+    canvasScale: appState.canvasScale,
+    canvasOffset: appState.canvasOffset,
+    isPanning: appState.isPanning,
+    setIsPanning: appState.setIsPanning,
+    panStart: appState.panStart,
+    setPanStart: appState.setPanStart,
+    currentFile,
+    setShowTableEditor: ui.setShowTableEditor,
+    setContextMenu: appState.setContextMenu,
+    setCellMediaMenu: ui.setCellMediaMenu
+  });
 
   return (
     <div className="app-root" style={{
@@ -210,12 +241,12 @@ const SketchCanvas = () => {
             cursor: selectedTool === 'draw' ? 'crosshair' : selectedTool === 'select' ? 'default' : 'crosshair',
             ...getBackgroundStyle(),
           }}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
-          onTouchStart={handleCanvasMouseDown}
-          onTouchMove={handleCanvasMouseMove}
-          onTouchEnd={handleCanvasMouseUp}
+          onMouseDown={canvasMouseHandlers.handleCanvasMouseDown}
+          onMouseMove={canvasMouseHandlers.handleCanvasMouseMove}
+          onMouseUp={canvasMouseHandlers.handleCanvasMouseUp}
+          onTouchStart={canvasMouseHandlers.handleCanvasMouseDown}
+          onTouchMove={canvasMouseHandlers.handleCanvasMouseMove}
+          onTouchEnd={canvasMouseHandlers.handleCanvasMouseUp}
           onClick={() => {
             setSelectedObject(null);
             setConnectingFrom(null);

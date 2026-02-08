@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
-import { getCanvasCoords } from '../utils/canvasUtils';
+import { getCanvasCoords, isPointInObject, getResizeHandle } from '../utils/canvasUtils';
 
-export default function useCanvasMouseHandlers({
   canvasRef,
   canvasObjects,
   setCanvasObjects,
@@ -30,8 +29,6 @@ export default function useCanvasMouseHandlers({
   panStart,
   setPanStart,
   currentFile,
-  isPointInObject,
-  getResizeHandle,
   setShowTableEditor,
   setContextMenu,
   setCellMediaMenu
@@ -83,7 +80,7 @@ export default function useCanvasMouseHandlers({
     }
   }, [
     currentFile, selectedTool, canvasObjects, isDrawing, canvasRef, canvasScale, canvasOffset,
-    isPanning, isPointInObject, getResizeHandle, setResizingObject, setResizeHandle,
+    isPanning, setResizingObject, setResizeHandle,
     setSelectedObject, setIsDraggingObject, setDragStart, setDrawingPath, setIsDrawing,
     setIsPanning, setPanStart
   ]);
