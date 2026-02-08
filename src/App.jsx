@@ -34,11 +34,18 @@ const SketchCanvas = () => {
   const [currentFile, setCurrentFile] = React.useState(null);
 
   // Hooks
+  const [folders, setFolders] = React.useState([]);
+  const [files, setFiles] = React.useState([]);
+  const [expandedFolders, setExpandedFolders] = React.useState(new Set());
+  const [canvasObjects, setCanvasObjects] = React.useState([]);
+  const [connections, setConnections] = React.useState([]);
+  const [animations, setAnimations] = React.useState([]);
   const auth = useAuth(setCurrentUser, setIsAuthenticated);
-  const foldersState = useFolders();
-  const { folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders, createFolder, createFile, openFile } = foldersState;
+  const foldersState = useFolders(setFiles, setCurrentFile, setCanvasObjects, setConnections, setAnimations);
+  // Use foldersState for createFolder, createFile, openFile
+  const { createFolder, createFile, openFile } = foldersState;
   const canvasState = useCanvas();
-  const { canvasObjects, setCanvasObjects, selectedTool, setSelectedTool, selectedObject, setSelectedObject, isDrawing, setIsDrawing, drawingPath, setDrawingPath, connections, setConnections, connectingFrom, setConnectingFrom, animations, setAnimations, isPlaying, setIsPlaying } = canvasState;
+  const { selectedTool, setSelectedTool, selectedObject, setSelectedObject, isDrawing, setIsDrawing, drawingPath, setDrawingPath, connectingFrom, setConnectingFrom, isPlaying, setIsPlaying } = canvasState;
   const ui = useUI();
   const { darkMode, setDarkMode, backgroundPattern, setBackgroundPattern, showTableEditor, setShowTableEditor, resizingObject, setResizingObject, resizeHandle, setResizeHandle, editingCell, setEditingCell, cellMediaMenu, setCellMediaMenu } = ui;
   const appState = useAppState();
@@ -66,14 +73,42 @@ const SketchCanvas = () => {
     backgroundPattern
   });
 
-  // Placeholder handlers for missing logic
+  // Handlers for sidebar and filetree
   const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(null); localStorage.removeItem('canvasAuth'); };
-  const handleDragStart = () => {};
-  const handleDragOver = () => {};
-  const handleDrop = () => {};
-  const toggleFolder = () => {};
-  const deleteFolder = () => {};
-  const deleteFile = () => {};
+  const handleDragStart = (e, item, type) => {
+    e.dataTransfer.setData('item', JSON.stringify(item));
+    e.dataTransfer.setData('type', type);
+  };
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+  const handleDrop = (e, targetFolder) => {
+    e.preventDefault();
+    const item = JSON.parse(e.dataTransfer.getData('item'));
+    const type = e.dataTransfer.getData('type');
+    if (type === 'folder' && targetFolder) {
+      setFolders(prev => prev.map(f => f.id === item.id ? { ...f, parentId: targetFolder.id } : f));
+    } else if (type === 'file' && targetFolder) {
+      setFiles(prev => prev.map(f => f.id === item.id ? { ...f, folderId: targetFolder.id } : f));
+    }
+  };
+  const toggleFolder = (folderId) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) newSet.delete(folderId);
+      else newSet.add(folderId);
+      return newSet;
+    });
+  };
+  const deleteFolder = (folderId, e) => {
+    if (e) e.stopPropagation();
+    setFolders(prev => prev.filter(f => f.id !== folderId && f.parentId !== folderId));
+    setFiles(prev => prev.filter(f => f.folderId !== folderId));
+  };
+  const deleteFile = (fileId, e) => {
+    if (e) e.stopPropagation();
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+  };
   const saveCurrentFile = () => {};
   const importOneNote = () => {};
   const handleCanvasMouseDown = () => {};
