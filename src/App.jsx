@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Square, Circle, Triangle, Table, Pencil, FolderPlus, File, Save, LogOut, Trash2, Download, Upload, Wand2, Type, ChevronRight, ChevronDown, Move, Edit3, Link, Play, Moon, Sun, Grid3x3, Minus as LineIcon, X, Settings, Image, Video } from 'lucide-react';
+import { Plus, Square, Circle, Triangle, Table, Pencil, FolderPlus, File, Save, LogOut, Trash2, Download, Upload, Wand2, Type, ChevronRight, ChevronDown, Move, Moon, Sun, Grid3x3, Minus as LineIcon, X, Settings, Image, Video } from 'lucide-react';
+import FileTree from './components/FileTree';
+import CanvasObject from './components/CanvasObject';
+import AuthForm from './components/AuthForm';
+import NoFileSelected from './components/NoFileSelected';
 
 const SketchCanvas = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -1581,96 +1585,15 @@ useEffect(() => {
   
   if (!isAuthenticated) {
     return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#0f172a',
-      }}>
-        <div style={{
-          backgroundColor: '#1e293b',
-          padding: '2rem',
-          borderRadius: '12px',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-          width: '100%',
-          maxWidth: '400px',
-        }}>
-          <h2 style={{ color: '#f1f5f9', marginBottom: '1.5rem', textAlign: 'center' }}>
-            {authMode === 'login' ? 'Login' : 'Register'}
-          </h2>
-          
-          <form onSubmit={handleAuth}>
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                marginBottom: '1rem',
-                backgroundColor: '#334155',
-                border: '2px solid #475569',
-                borderRadius: '8px',
-                color: '#f1f5f9',
-                fontSize: '1rem',
-              }}
-            />
-            
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                marginBottom: '1.5rem',
-                backgroundColor: '#334155',
-                border: '2px solid #475569',
-                borderRadius: '8px',
-                color: '#f1f5f9',
-                fontSize: '1rem',
-              }}
-            />
-            
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: '#3b82f6',
-                border: 'none',
-                borderRadius: '8px',
-                color: 'white',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                marginBottom: '1rem',
-              }}
-            >
-              {authMode === 'login' ? 'Login' : 'Register'}
-            </button>
-          </form>
-          
-          <button
-            onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              backgroundColor: 'transparent',
-              border: '2px solid #475569',
-              borderRadius: '8px',
-              color: '#94a3b8',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-            }}
-          >
-            {authMode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
-          </button>
-        </div>
-      </div>
+      <AuthForm
+        authMode={authMode}
+        username={username}
+        password={password}
+        setUsername={setUsername}
+        setPassword={setPassword}
+        handleAuth={handleAuth}
+        setAuthMode={setAuthMode}
+      />
     );
   }
   
@@ -1779,7 +1702,22 @@ useEffect(() => {
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, null)}
         >
-          {renderFileTree()}
+          <FileTree
+            folders={folders}
+            files={files}
+            expandedFolders={expandedFolders}
+            currentFile={currentFile}
+            darkMode={darkMode}
+            handleDragStart={handleDragStart}
+            handleDragOver={handleDragOver}
+            handleDrop={handleDrop}
+            toggleFolder={toggleFolder}
+            createFolder={createFolder}
+            createFile={createFile}
+            deleteFolder={deleteFolder}
+            deleteFile={deleteFile}
+            openFile={openFile}
+          />
         </div>
         
         <div style={{
@@ -2129,7 +2067,19 @@ useEffect(() => {
             </defs>
           </svg>
           
-          {canvasObjects.map(obj => renderObject(obj))}
+          {canvasObjects.map(obj => (
+            <CanvasObject
+              key={obj.id}
+              obj={obj}
+              isSelected={selectedObject?.id === obj.id}
+              selectedTool={selectedTool}
+              darkMode={darkMode}
+              setSelectedObject={setSelectedObject}
+              handleConnect={handleConnect}
+              handleObjectDoubleClick={handleObjectDoubleClick}
+              renderResizeHandles={renderResizeHandles}
+            />
+          ))}
           
           {isDrawing && drawingPath.length > 0 && (
             <svg
@@ -2151,24 +2101,7 @@ useEffect(() => {
             </svg>
           )}
           
-          {!currentFile && (
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center',
-              color: '#64748b',
-            }}>
-              <Edit3 size={64} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: darkMode ? '#94a3b8' : '#475569' }}>
-                No File Selected
-              </h3>
-              <p style={{ fontSize: '1rem' }}>
-                Create or open a file to start sketching
-              </p>
-            </div>
-          )}
+          {!currentFile && <NoFileSelected darkMode={darkMode} />}
         </div>
       </div>
       
