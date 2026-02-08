@@ -1,14 +1,27 @@
-import React, { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
-const useAuth = (setCurrentUser, setIsAuthenticated, setFolders, setFiles, setCurrentFile, setCanvasObjects, setConnections) => {
+export const useAuth = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  useEffect(() => {
+    const savedAuth = localStorage.getItem('canvasAuth');
+    if (savedAuth) {
+      const { user } = JSON.parse(savedAuth);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   const handleAuth = (e) => {
     e.preventDefault();
     if (!username || !password) return;
+
     const users = JSON.parse(localStorage.getItem('canvasUsers') || '{}');
+
     if (authMode === 'register') {
       if (users[username]) {
         alert('Username already exists');
@@ -24,22 +37,28 @@ const useAuth = (setCurrentUser, setIsAuthenticated, setFolders, setFiles, setCu
         setCurrentUser(username);
         setIsAuthenticated(true);
         localStorage.setItem('canvasAuth', JSON.stringify({ user: username }));
-        // loadUserData(username); // Should be called in parent
       } else {
         alert('Invalid credentials');
       }
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('canvasAuth');
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+  };
+
   return {
+    isAuthenticated,
+    currentUser,
     authMode,
-    setAuthMode,
     username,
-    setUsername,
     password,
+    setAuthMode,
+    setUsername,
     setPassword,
     handleAuth,
+    handleLogout,
   };
 };
-
-export default useAuth;
