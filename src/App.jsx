@@ -63,7 +63,16 @@ const SketchCanvas = () => {
   const [isDraggingObject, setIsDraggingObject] = React.useState(false);
   const canvasRef = React.useRef(null);
 
-  const auth = useAuth(setCurrentUser, setIsAuthenticated);
+  // Pass all setters to useAuth so it can clear state on logout/login
+  const auth = useAuth(
+    setCurrentUser,
+    setIsAuthenticated,
+    setFolders,
+    setFiles,
+    setCurrentFile,
+    setCanvasObjects,
+    setConnections
+  );
   const foldersState = useFolders({
     folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders,
     setCurrentFile, setCanvasObjects, setConnections, setAnimations
@@ -165,7 +174,18 @@ const SketchCanvas = () => {
   });
 
   if (!isAuthenticated) {
-    return <AuthForm {...auth} />;
+    // Pass all props required by AuthForm
+    return (
+      <AuthForm
+        authMode={auth.authMode}
+        setAuthMode={auth.setAuthMode}
+        username={auth.username}
+        setUsername={auth.setUsername}
+        password={auth.password}
+        setPassword={auth.setPassword}
+        handleAuth={auth.handleAuth}
+      />
+    );
   }
 
   const canvasMouseHandlers = useCanvasMouseHandlers({
