@@ -2337,6 +2337,6 @@ const SketchCanvas = () => {
       )}
     </div>
   );
-}
+};
 
 export default SketchCanvas;
