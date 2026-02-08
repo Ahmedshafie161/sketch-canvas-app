@@ -35,6 +35,11 @@ const SketchCanvas = () => {
   const [dragStart, setDragStart] = useState(null);
   const [isDraggingObject, setIsDraggingObject] = useState(false);
   
+  // New states for added features
+  const [drawingHistory, setDrawingHistory] = useState([]);
+  const [isConvertingDrawing, setIsConvertingDrawing] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
+  
   useEffect(() => {
     const savedAuth = localStorage.getItem('canvasAuth');
     if (savedAuth) {
@@ -394,13 +399,19 @@ const SketchCanvas = () => {
       const newObject = {
         id: Date.now(),
         type: 'drawing',
-        path: drawingPath,
+        path: [...drawingPath], // Create a copy
         x: Math.min(...drawingPath.map(p => p.x)),
         y: Math.min(...drawingPath.map(p => p.y)),
         width: Math.max(...drawingPath.map(p => p.x)) - Math.min(...drawingPath.map(p => p.x)),
         height: Math.max(...drawingPath.map(p => p.y)) - Math.min(...drawingPath.map(p => p.y)),
+        strokeColor: darkMode ? '#f1f5f9' : '#000000',
+        strokeWidth: 2,
       };
       
+      // Save to drawing history
+      setDrawingHistory([...drawingHistory, newObject]);
+      
+      // Add to canvas objects
       setCanvasObjects([...canvasObjects, newObject]);
       setIsDrawing(false);
       setDrawingPath([]);
@@ -526,7 +537,64 @@ const SketchCanvas = () => {
   };
   
   const importOneNote = (e) => {
-    alert('OneNote import coming soon!');
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        // Try to parse as JSON first (for OneNote export format)
+        try {
+          const data = JSON.parse(event.target.result);
+          
+          // Create a text object to show imported content
+          const importedText = {
+            id: Date.now(),
+            type: 'text',
+            x: 100,
+            y: 100,
+            width: 400,
+            height: 200,
+            text: `Imported OneNote Content:\n\n${JSON.stringify(data, null, 2).substring(0, 1000)}...`,
+            backgroundColor: '#f0f9ff',
+            border: '2px solid #0ea5e9'
+          };
+          
+          setCanvasObjects([importedText]);
+          alert('OneNote content imported. View the text object for details.');
+        } catch (jsonError) {
+          // If not JSON, treat as plain text
+          const textContent = event.target.result;
+          
+          const importedText = {
+            id: Date.now(),
+            type: 'text',
+            x: 100,
+            y: 100,
+            width: 400,
+            height: 300,
+            text: `OneNote Import:\n\n${textContent.substring(0, 2000)}${textContent.length > 2000 ? '...' : ''}`,
+            backgroundColor: '#fef3c7',
+            border: '2px solid #f59e0b'
+          };
+          
+          setCanvasObjects([importedText]);
+          alert('OneNote content imported as text.');
+        }
+      } catch (error) {
+        alert('Failed to import OneNote file. Please ensure it\'s a valid export format.');
+        console.error('Import error:', error);
+      }
+    };
+    
+    // Handle different file types
+    if (file.name.endsWith('.one') || file.name.endsWith('.txt') || file.name.endsWith('.json')) {
+      reader.readAsText(file);
+    } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+      reader.readAsText(file);
+    } else {
+      alert('Unsupported file format. Please export OneNote as HTML, text, or JSON.');
+    }
   };
   
   const handleObjectDoubleClick = (obj, e) => {
@@ -575,6 +643,118 @@ const SketchCanvas = () => {
         handleCellEdit(objId, row, col, { video: event.target.result });
       };
       reader.readAsDataURL(file);
+    }
+  };
+  
+  const handleCellResize = (objId, row, col, e) => {
+    e.stopPropagation();
+    const cell = document.querySelector(`[data-cell-id="${objId}-${row}-${col}"]`);
+    if (!cell) return;
+    
+    const newWidth = prompt('Enter cell width (px):', cell.offsetWidth);
+    const newHeight = prompt('Enter cell height (px):', cell.offsetHeight);
+    
+    if (newWidth && newHeight) {
+      setCanvasObjects(canvasObjects.map(obj => {
+        if (obj.id === objId && obj.type === 'table') {
+          const updatedCells = [...obj.cells];
+          if (!updatedCells[row]) updatedCells[row] = [];
+          if (!updatedCells[row][col]) updatedCells[row][col] = {};
+          
+          updatedCells[row][col] = {
+            ...updatedCells[row][col],
+            customWidth: parseInt(newWidth),
+            customHeight: parseInt(newHeight)
+          };
+          
+          // Calculate table dimensions based on cell sizes
+          let totalWidth = 0;
+          let totalHeight = 0;
+          
+          // Recalculate column widths and row heights
+          const colWidths = Array(obj.cols).fill(80);
+          const rowHeights = Array(obj.rows).fill(60);
+          
+          for (let r = 0; r < obj.rows; r++) {
+            for (let c = 0; c < obj.cols; c++) {
+              const cell = updatedCells[r]?.[c];
+              if (cell?.customWidth) {
+                colWidths[c] = Math.max(colWidths[c], cell.customWidth);
+              }
+              if (cell?.customHeight) {
+                rowHeights[r] = Math.max(rowHeights[r], cell.customHeight);
+              }
+            }
+          }
+          
+          totalWidth = colWidths.reduce((a, b) => a + b, 0);
+          totalHeight = rowHeights.reduce((a, b) => a + b, 0);
+          
+          return {
+            ...obj,
+            cells: updatedCells,
+            colWidths,
+            rowHeights,
+            width: Math.max(obj.width, totalWidth),
+            height: Math.max(obj.height, totalHeight)
+          };
+        }
+        return obj;
+      }));
+    }
+  };
+  
+  // Convert drawing to text using OCR simulation
+  const convertDrawingToText = (drawingId) => {
+    const drawing = canvasObjects.find(obj => obj.id === drawingId);
+    if (!drawing || drawing.type !== 'drawing') return;
+    
+    const text = prompt('Enter text for this drawing:', 'Recognized text');
+    if (text) {
+      setCanvasObjects(canvasObjects.map(obj => 
+        obj.id === drawingId 
+          ? {
+              ...obj,
+              type: 'text',
+              text: text,
+              path: undefined, // Remove drawing path
+              width: Math.max(100, obj.width),
+              height: Math.max(40, obj.height)
+            }
+          : obj
+      ));
+      setSelectedObject(null);
+    }
+  };
+  
+  // Convert drawing to geometric shape
+  const convertDrawingToShape = (drawingId, shapeType) => {
+    const drawing = canvasObjects.find(obj => obj.id === drawingId);
+    if (!drawing || drawing.type !== 'drawing') return;
+    
+    setCanvasObjects(canvasObjects.map(obj => 
+      obj.id === drawingId 
+        ? {
+            ...obj,
+            type: shapeType,
+            path: undefined, // Remove drawing path
+            width: Math.max(50, obj.width),
+            height: Math.max(50, obj.height)
+          }
+        : obj
+    ));
+    setSelectedObject(null);
+  };
+  
+  // Add context menu handler
+  const handleContextMenu = (e, obj) => {
+    e.preventDefault();
+    if (obj.type === 'drawing') {
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        objectId: obj.id
+      });
     }
   };
   
@@ -765,26 +945,101 @@ const SketchCanvas = () => {
                     {row.map((cell, ci) => (
                       <td
                         key={ci}
+                        data-cell-id={`${obj.id}-${ri}-${ci}`}
                         style={{
                           border: '1px solid ' + (darkMode ? '#475569' : '#cbd5e1'),
                           padding: '4px',
                           textAlign: 'center',
                           verticalAlign: 'middle',
                           position: 'relative',
-                          minWidth: '80px',
-                          minHeight: '60px',
+                          minWidth: cell.customWidth || '80px',
+                          minHeight: cell.customHeight || '60px',
+                          width: cell.customWidth || 'auto',
+                          height: cell.customHeight || 'auto',
+                          maxWidth: '300px',
+                          maxHeight: '200px',
+                          overflow: 'hidden',
+                          wordWrap: 'break-word',
+                          whiteSpace: 'normal',
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingCell({ objId: obj.id, row: ri, col: ci });
                         }}
+                        onDoubleClick={(e) => handleCellResize(obj.id, ri, ci, e)}
                       >
                         {cell.image && (
-                          <img
-                            src={cell.image}
-                            alt="Cell content"
-                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                          />
+                          <div style={{
+                            position: 'relative',
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <img
+                              src={cell.image}
+                              alt="Cell content"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                cursor: 'pointer',
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Open image in modal for better view
+                                const modal = document.createElement('div');
+                                modal.style.cssText = `
+                                  position: fixed;
+                                  top: 0;
+                                  left: 0;
+                                  width: 100%;
+                                  height: 100%;
+                                  background: rgba(0,0,0,0.8);
+                                  display: flex;
+                                  align-items: center;
+                                  justify-content: center;
+                                  z-index: 9999;
+                                `;
+                                modal.innerHTML = `
+                                  <div style="position: relative;">
+                                    <img src="${cell.image}" style="max-width: 90vw; max-height: 90vh;" />
+                                    <button onclick="this.parentElement.parentElement.remove()" style="
+                                      position: absolute;
+                                      top: -40px;
+                                      right: 0;
+                                      background: #ef4444;
+                                      color: white;
+                                      border: none;
+                                      padding: 8px 16px;
+                                      border-radius: 4px;
+                                      cursor: pointer;
+                                    ">Close</button>
+                                  </div>
+                                `;
+                                document.body.appendChild(modal);
+                              }}
+                            />
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '4px',
+                              right: '4px',
+                              fontSize: '10px',
+                              backgroundColor: 'rgba(0,0,0,0.5)',
+                              color: 'white',
+                              padding: '2px 4px',
+                              borderRadius: '2px',
+                              cursor: 'pointer',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCellResize(obj.id, ri, ci, e);
+                            }}
+                            >
+                              Resize
+                            </div>
+                          </div>
                         )}
                         {cell.video && (
                           <video
@@ -941,12 +1196,13 @@ const SketchCanvas = () => {
                 setSelectedObject(obj);
               }
             }}
+            onContextMenu={(e) => handleContextMenu(e, obj)}
           >
             <polyline
               points={obj.path.map(p => `${p.x - obj.x},${p.y - obj.y}`).join(' ')}
               fill="none"
-              stroke={darkMode ? '#f1f5f9' : '#000000'}
-              strokeWidth="2"
+              stroke={obj.strokeColor || (darkMode ? '#f1f5f9' : '#000000')}
+              strokeWidth={obj.strokeWidth || 2}
             />
             {renderResizeHandles()}
           </svg>
@@ -1308,6 +1564,57 @@ const SketchCanvas = () => {
             ))}
           </div>
           
+          {/* Drawing conversion buttons */}
+          {selectedObject?.type === 'drawing' && (
+            <>
+              <div style={{
+                width: '1px',
+                height: '30px',
+                backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+              }} />
+              
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => convertDrawingToText(selectedObject.id)}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    backgroundColor: '#8b5cf6',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <Type size={16} />
+                  Convert to Text
+                </button>
+                
+                <button
+                  onClick={() => convertDrawingToShape(selectedObject.id, 'rectangle')}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    backgroundColor: '#10b981',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <Square size={16} />
+                  Convert to Shape
+                </button>
+              </div>
+            </>
+          )}
+          
           <div style={{
             width: '1px',
             height: '30px',
@@ -1415,7 +1722,7 @@ const SketchCanvas = () => {
               Import
               <input
                 type="file"
-                accept=".json,.one"
+                accept=".json,.one,.txt,.html,.htm"
                 onChange={(e) => {
                   if (e.target.files[0]?.name.endsWith('.one')) {
                     importOneNote(e);
@@ -1492,6 +1799,7 @@ const SketchCanvas = () => {
             setSelectedObject(null);
             setConnectingFrom(null);
             setShowTableEditor(null);
+            setContextMenu(null);
           }}
         >
           {/* Render connections */}
@@ -1581,6 +1889,104 @@ const SketchCanvas = () => {
           )}
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            backgroundColor: darkMode ? '#1e293b' : 'white',
+            border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+            borderRadius: '8px',
+            padding: '8px',
+            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          }}
+          onClick={() => setContextMenu(null)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <button
+              onClick={() => convertDrawingToText(contextMenu.objectId)}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Type size={14} />
+              Convert to Text
+            </button>
+            <div style={{ height: '1px', backgroundColor: darkMode ? '#334155' : '#e2e8f0' }} />
+            <button
+              onClick={() => convertDrawingToShape(contextMenu.objectId, 'rectangle')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Square size={14} />
+              Convert to Rectangle
+            </button>
+            <button
+              onClick={() => convertDrawingToShape(contextMenu.objectId, 'circle')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Circle size={14} />
+              Convert to Circle
+            </button>
+            <button
+              onClick={() => convertDrawingToShape(contextMenu.objectId, 'triangle')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Triangle size={14} />
+              Convert to Triangle
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
