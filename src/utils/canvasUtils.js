@@ -1,3 +1,19 @@
+// Returns canvas coordinates from mouse/touch event, accounting for scale and offset
+export function getCanvasCoords(e, canvasRef, canvasScale, canvasOffset) {
+  const rect = canvasRef.current.getBoundingClientRect();
+  let x, y;
+  if (e.touches) {
+    x = e.touches[0].clientX - rect.left;
+    y = e.touches[0].clientY - rect.top;
+  } else {
+    x = e.clientX - rect.left;
+    y = e.clientY - rect.top;
+  }
+  // Apply scale and offset
+  x = (x / canvasScale) - canvasOffset.x;
+  y = (y / canvasScale) - canvasOffset.y;
+  return { x, y };
+}
 // Utility functions extracted from App.jsx
 export function isPointInObject(point, obj) {
   return point.x >= obj.x &&

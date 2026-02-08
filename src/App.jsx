@@ -17,6 +17,7 @@ import useFolders from './components/hooks/useFolders';
 import useCanvas from './components/hooks/useCanvas';
 import useUI from './components/hooks/useUI';
 import useCanvasRefs from './components/hooks/useCanvasRefs';
+import useCanvasMouseHandlers from './hooks/useCanvasMouseHandlers';
 import useAppEffects from './components/hooks/useAppEffects';
 import useCanvasUIHandlers from './hooks/useCanvasUIHandlers';
 import useAppState from './hooks/useAppState';
