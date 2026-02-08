@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { renderResizeHandles } from './canvasStyles';
 
 export const renderTableObject = (
@@ -13,8 +13,6 @@ export const renderTableObject = (
   handleCellMediaMenu,
   setShowTableEditor
 ) => {
-  const [editingCell, setEditingCell] = useState(null);
-
   const renderNestedTable = (nestedTable, cellStyle) => {
     return (
       <table style={{
@@ -51,8 +49,8 @@ export const renderTableObject = (
     const cell = document.querySelector(`[data-cell-id="${objId}-${row}-${col}"]`);
     if (!cell) return;
 
-    const newWidth = prompt('Enter cell width (px):', cell.offsetWidth);
-    const newHeight = prompt('Enter cell height (px):', cell.offsetHeight);
+    const newWidth = window.prompt('Enter cell width (px):', cell.offsetWidth);
+    const newHeight = window.prompt('Enter cell height (px):', cell.offsetHeight);
 
     if (newWidth && newHeight) {
       const content = {
@@ -100,13 +98,9 @@ export const renderTableObject = (
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setEditingCell({ objId: obj.id, row: ri, col: ci });
                   }}
                   onDoubleClick={(e) => handleCellResize(obj.id, ri, ci, e)}
-                  onContextMenu={(e) => {
-                    const menu = handleCellMediaMenu(e, obj.id, ri, ci);
-                    setEditingCell({ objId: obj.id, row: ri, col: ci });
-                  }}
+                  onContextMenu={(e) => handleCellMediaMenu(e, obj.id, ri, ci)}
                 >
                   {cell.image && (
                     <div style={{
@@ -216,11 +210,10 @@ export const renderTableObject = (
 
                   {!cell.image && !cell.video && !cell.nestedTable && (
                     <div
-                      contentEditable={editingCell?.objId === obj.id && editingCell?.row === ri && editingCell?.col === ci}
+                      contentEditable
                       suppressContentEditableWarning
                       onBlur={(e) => {
                         handleCellEdit(obj.id, ri, ci, { text: e.target.textContent });
-                        setEditingCell(null);
                       }}
                       style={{
                         outline: 'none',
@@ -233,23 +226,6 @@ export const renderTableObject = (
                       {cell.text}
                     </div>
                   )}
-
-                  <div style={{
-                    position: 'absolute',
-                    top: '2px',
-                    right: '2px',
-                    fontSize: '10px',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    backgroundColor: 'rgba(255,255,255,0.7)',
-                    padding: '1px 3px',
-                    borderRadius: '2px',
-                    display: 'none',
-                  }}
-                  className="cell-actions"
-                  >
-                    ⋮
-                  </div>
                 </td>
               ))}
             </tr>

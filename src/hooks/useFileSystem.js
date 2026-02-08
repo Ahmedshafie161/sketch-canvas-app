@@ -74,7 +74,7 @@ export const useFileSystem = (isAuthenticated, currentUser) => {
 
   const deleteFile = (fileId, e) => {
     e.stopPropagation();
-    if (confirm('Delete this file?')) {
+    if (window.confirm('Delete this file?')) {
       setFiles(files.filter(f => f.id !== fileId));
       if (currentFile?.id === fileId) {
         setCurrentFile(null);
@@ -84,7 +84,7 @@ export const useFileSystem = (isAuthenticated, currentUser) => {
 
   const deleteFolder = (folderId, e) => {
     e.stopPropagation();
-    if (confirm('Delete this folder and all its contents?')) {
+    if (window.confirm('Delete this folder and all its contents?')) {
       const foldersToDelete = getAllSubfolders(folderId);
       foldersToDelete.push(folderId);
 
@@ -207,54 +207,176 @@ export const useFileSystem = (isAuthenticated, currentUser) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(text, 'text/html');
 
-      let content = '';
+      const importedObjects = [];
+      let yOffset = 100;
+
+      // Extract title
       const titleElement = doc.querySelector('title') || doc.querySelector('h1');
-      if (titleElement) {
-        content += `Title: ${titleElement.textContent}\n\n`;
+      if (titleElement && titleElement.textContent.trim()) {
+        importedObjects.push({
+          id: Date.now() + Math.random(),
+          type: 'text',
+          x: 100,
+          y: yOffset,
+          width: 600,
+          height: 60,
+          text: titleElement.textContent.trim(),
+          backgroundColor: '#dbeafe',
+          fontSize: '24px',
+          fontWeight: 'bold'
+        });
+        yOffset += 80;
       }
 
-      const paragraphs = doc.querySelectorAll('p, div[class*="paragraph"]');
-      if (paragraphs.length > 0) {
-        paragraphs.forEach((p) => {
-          if (p.textContent.trim()) {
-            content += `${p.textContent}\n`;
+      // Extract images
+      const images = doc.querySelectorAll('img');
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        let src = img.src || img.getAttribute('data-src');
+        
+        // Handle data URLs (base64 embedded images)
+        if (src && (src.startsWith('data:') || src.startsWith('http'))) {
+          importedObjects.push({
+            id: Date.now() + Math.random(),
+            type: 'rectangle',
+            x: 100 + (i % 3) * 220,
+            y: yOffset + Math.floor(i / 3) * 200,
+            width: 200,
+            height: 150,
+            backgroundColor: '#fef3c7',
+            imageUrl: src,
+            text: img.alt || `Image ${i + 1}`
+          });
+        }
+      }
+      
+      if (images.length > 0) {
+        yOffset += Math.ceil(images.length / 3) * 200 + 20;
+      }
+
+      // Extract tables
+      const tables = doc.querySelectorAll('table');
+      for (let t = 0; t < tables.length; t++) {
+        const table = tables[t];
+        const rows = table.querySelectorAll('tr');
+        
+        if (rows.length > 0) {
+          const cells = [];
+          
+          rows.forEach((row) => {
+            const rowCells = [];
+            const tableCells = row.querySelectorAll('td, th');
+            
+            tableCells.forEach((cell) => {
+              // Check if cell contains an image
+              const cellImg = cell.querySelector('img');
+              let cellContent = {
+                text: cell.textContent.trim(),
+                image: null,
+                video: null,
+                nestedTable: null
+              };
+              
+              if (cellImg) {
+                const imgSrc = cellImg.src || cellImg.getAttribute('data-src');
+                if (imgSrc && (imgSrc.startsWith('data:') || imgSrc.startsWith('http'))) {
+                  cellContent.image = imgSrc;
+                  cellContent.text = cellImg.alt || '';
+                }
+              }
+              
+              rowCells.push(cellContent);
+            });
+            
+            if (rowCells.length > 0) {
+              cells.push(rowCells);
+            }
+          });
+
+          if (cells.length > 0) {
+            // Normalize table (make all rows same length)
+            const maxCols = Math.max(...cells.map(row => row.length));
+            const normalizedCells = cells.map(row => {
+              while (row.length < maxCols) {
+                row.push({ text: '', image: null, video: null, nestedTable: null });
+              }
+              return row;
+            });
+
+            importedObjects.push({
+              id: Date.now() + Math.random(),
+              type: 'table',
+              x: 100,
+              y: yOffset,
+              width: Math.min(800, maxCols * 120),
+              height: Math.min(400, cells.length * 60),
+              rows: cells.length,
+              cols: maxCols,
+              cells: normalizedCells
+            });
+            
+            yOffset += Math.min(400, cells.length * 60) + 20;
           }
-        });
-      } else {
-        const body = doc.body;
-        if (body && body.textContent) {
-          content = body.textContent.substring(0, 5000);
         }
       }
 
-      if (!content.trim()) {
-        content = text.substring(0, 2000);
-        if (text.length > 2000) content += '...';
+      // Extract paragraphs (text content)
+      const paragraphs = doc.querySelectorAll('p, div[class*="paragraph"]');
+      let textContent = '';
+      
+      paragraphs.forEach((p) => {
+        const text = p.textContent.trim();
+        if (text && !text.match(/^(image|table)/i)) {
+          textContent += text + '\n\n';
+        }
+      });
+
+      // If we got text content, add it
+      if (textContent.trim()) {
+        importedObjects.push({
+          id: Date.now() + Math.random(),
+          type: 'text',
+          x: 100,
+          y: yOffset,
+          width: 600,
+          height: Math.min(400, Math.max(200, textContent.split('\n').length * 20)),
+          text: textContent.trim(),
+          backgroundColor: '#f0f9ff',
+          fontSize: '14px',
+          overflow: 'auto'
+        });
       }
 
-      const importedText = {
-        id: Date.now(),
-        type: 'text',
-        x: 100,
-        y: 100,
-        width: 600,
-        height: 400,
-        text: `OneNote Import\n\n${content}`,
-        backgroundColor: '#f0f9ff',
-        border: '2px solid #0ea5e9',
-        fontSize: '14px',
-        overflow: 'auto'
-      };
+      // If nothing was extracted, show raw text
+      if (importedObjects.length === 0) {
+        const body = doc.body;
+        const fallbackText = body && body.textContent ? 
+          body.textContent.substring(0, 3000) : 
+          text.substring(0, 2000);
+        
+        importedObjects.push({
+          id: Date.now(),
+          type: 'text',
+          x: 100,
+          y: 100,
+          width: 600,
+          height: 400,
+          text: `OneNote Import (Raw)\n\n${fallbackText}${fallbackText.length >= 2000 ? '...' : ''}`,
+          backgroundColor: '#fef3c7',
+          fontSize: '14px',
+          overflow: 'auto'
+        });
+      }
 
       setCurrentFile({
         ...currentFile,
-        objects: [...(currentFile.objects || []), importedText]
+        objects: [...(currentFile.objects || []), ...importedObjects]
       });
 
-      alert('OneNote imported successfully!');
+      alert(`OneNote imported successfully!\n${importedObjects.length} objects created:\n- ${importedObjects.filter(o => o.type === 'text').length} text boxes\n- ${importedObjects.filter(o => o.imageUrl).length} images\n- ${importedObjects.filter(o => o.type === 'table').length} tables`);
     } catch (error) {
       console.error('OneNote import error:', error);
-      alert('Failed to parse OneNote file.');
+      alert('Failed to parse OneNote file: ' + error.message);
     }
   };
 
