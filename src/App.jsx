@@ -29,6 +29,7 @@ const SketchCanvas = () => {
   const [resizingObject, setResizingObject] = useState(null);
   const [resizeHandle, setResizeHandle] = useState(null);
   const [editingCell, setEditingCell] = useState(null);
+  const [cellMediaMenu, setCellMediaMenu] = useState(null); // Added for cell media menu
   
   const canvasRef = useRef(null);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -433,7 +434,7 @@ const SketchCanvas = () => {
           text: selectedTool === 'text' ? 'Double-click to edit' : '',
           rows: selectedTool === 'table' ? 3 : undefined,
           cols: selectedTool === 'table' ? 3 : undefined,
-          cells: selectedTool === 'table' ? Array(3).fill().map(() => Array(3).fill({ text: '', image: null, video: null })) : undefined,
+          cells: selectedTool === 'table' ? Array(3).fill().map(() => Array(3).fill({ text: '', image: null, video: null, nestedTable: null })) : undefined,
         };
         
         setCanvasObjects([...canvasObjects, newObject]);
@@ -536,64 +537,120 @@ const SketchCanvas = () => {
     }
   };
   
-  const importOneNote = (e) => {
+  const importOneNote = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        // Try to parse as JSON first (for OneNote export format)
-        try {
-          const data = JSON.parse(event.target.result);
-          
-          // Create a text object to show imported content
-          const importedText = {
-            id: Date.now(),
-            type: 'text',
-            x: 100,
-            y: 100,
-            width: 400,
-            height: 200,
-            text: `Imported OneNote Content:\n\n${JSON.stringify(data, null, 2).substring(0, 1000)}...`,
-            backgroundColor: '#f0f9ff',
-            border: '2px solid #0ea5e9'
-          };
-          
-          setCanvasObjects([importedText]);
-          alert('OneNote content imported. View the text object for details.');
-        } catch (jsonError) {
-          // If not JSON, treat as plain text
-          const textContent = event.target.result;
-          
-          const importedText = {
-            id: Date.now(),
-            type: 'text',
-            x: 100,
-            y: 100,
-            width: 400,
-            height: 300,
-            text: `OneNote Import:\n\n${textContent.substring(0, 2000)}${textContent.length > 2000 ? '...' : ''}`,
-            backgroundColor: '#fef3c7',
-            border: '2px solid #f59e0b'
-          };
-          
-          setCanvasObjects([importedText]);
-          alert('OneNote content imported as text.');
-        }
-      } catch (error) {
-        alert('Failed to import OneNote file. Please ensure it\'s a valid export format.');
-        console.error('Import error:', error);
+    try {
+      // Read file as text first
+      const text = await file.text();
+      
+      // Try to parse as XML/HTML (OneNote export format)
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/html');
+      
+      // Extract content from OneNote HTML format
+      let content = '';
+      
+      // Look for common OneNote elements
+      const titleElement = doc.querySelector('title') || doc.querySelector('h1');
+      if (titleElement) {
+        content += `Title: ${titleElement.textContent}\n\n`;
       }
-    };
-    
-    // Handle different file types
-    if (file.name.endsWith('.one') || file.name.endsWith('.txt') || file.name.endsWith('.json')) {
+      
+      // Get all paragraphs
+      const paragraphs = doc.querySelectorAll('p, div[class*="paragraph"]');
+      if (paragraphs.length > 0) {
+        paragraphs.forEach((p, i) => {
+          if (p.textContent.trim()) {
+            content += `${p.textContent}\n`;
+          }
+        });
+      } else {
+        // Fallback: try to get body text
+        const body = doc.body;
+        if (body && body.textContent) {
+          content = body.textContent.substring(0, 5000);
+        }
+      }
+      
+      if (!content.trim()) {
+        // If no content found, show the raw text
+        content = text.substring(0, 2000);
+        if (text.length > 2000) content += '...';
+      }
+      
+      // Create a text object to show imported content
+      const importedText = {
+        id: Date.now(),
+        type: 'text',
+        x: 100,
+        y: 100,
+        width: 600,
+        height: 400,
+        text: `OneNote Import\n\n${content}`,
+        backgroundColor: '#f0f9ff',
+        border: '2px solid #0ea5e9',
+        fontSize: '14px',
+        overflow: 'auto'
+      };
+      
+      // Also try to extract images
+      const images = doc.querySelectorAll('img');
+      if (images.length > 0) {
+        // Create image objects for each found image
+        const imageObjects = Array.from(images).map((img, index) => {
+          // Try to get image source
+          let src = img.src || img.getAttribute('data-src');
+          
+          // For data URLs, use directly
+          if (src && src.startsWith('data:')) {
+            return {
+              id: Date.now() + index,
+              type: 'rectangle',
+              x: 150 + (index * 220),
+              y: 550,
+              width: 200,
+              height: 150,
+              backgroundColor: '#fef3c7',
+              border: '2px solid #f59e0b',
+              imageUrl: src,
+              text: `Image ${index + 1}`,
+              renderAsImage: true
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        
+        setCanvasObjects([importedText, ...imageObjects]);
+      } else {
+        setCanvasObjects([...canvasObjects, importedText]);
+      }
+      
+      alert(`OneNote imported successfully! Found ${images.length} images.`);
+      
+    } catch (error) {
+      console.error('OneNote import error:', error);
+      alert('Failed to parse OneNote file. Showing as raw text.');
+      
+      // Fallback: read as text
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const textContent = event.target.result;
+        const importedText = {
+          id: Date.now(),
+          type: 'text',
+          x: 100,
+          y: 100,
+          width: 600,
+          height: 400,
+          text: `OneNote Import (Raw)\n\n${textContent.substring(0, 3000)}${textContent.length > 3000 ? '...' : ''}`,
+          backgroundColor: '#fef3c7',
+          border: '2px solid #f59e0b'
+        };
+        setCanvasObjects([...canvasObjects, importedText]);
+      };
       reader.readAsText(file);
-    } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
-      reader.readAsText(file);
-    } else {
-      alert('Unsupported file format. Please export OneNote as HTML, text, or JSON.');
     }
   };
   
@@ -629,7 +686,12 @@ const SketchCanvas = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        handleCellEdit(objId, row, col, { image: event.target.result });
+        handleCellEdit(objId, row, col, { 
+          image: event.target.result,
+          text: '', // Clear text when adding image
+          video: null, // Remove video if exists
+          nestedTable: null // Remove nested table if exists
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -640,10 +702,30 @@ const SketchCanvas = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        handleCellEdit(objId, row, col, { video: event.target.result });
+        handleCellEdit(objId, row, col, { 
+          video: event.target.result,
+          text: '', // Clear text when adding video
+          image: null, // Remove image if exists
+          nestedTable: null // Remove nested table if exists
+        });
       };
       reader.readAsDataURL(file);
     }
+  };
+  
+  const handleNestedTableAdd = (objId, row, col) => {
+    const nestedTable = {
+      rows: 2,
+      cols: 2,
+      cells: Array(2).fill().map(() => Array(2).fill({ text: '' }))
+    };
+    
+    handleCellEdit(objId, row, col, { 
+      nestedTable,
+      text: '', // Clear text when adding nested table
+      image: null, // Remove image if exists
+      video: null // Remove video if exists
+    });
   };
   
   const handleCellResize = (objId, row, col, e) => {
@@ -667,36 +749,9 @@ const SketchCanvas = () => {
             customHeight: parseInt(newHeight)
           };
           
-          // Calculate table dimensions based on cell sizes
-          let totalWidth = 0;
-          let totalHeight = 0;
-          
-          // Recalculate column widths and row heights
-          const colWidths = Array(obj.cols).fill(80);
-          const rowHeights = Array(obj.rows).fill(60);
-          
-          for (let r = 0; r < obj.rows; r++) {
-            for (let c = 0; c < obj.cols; c++) {
-              const cell = updatedCells[r]?.[c];
-              if (cell?.customWidth) {
-                colWidths[c] = Math.max(colWidths[c], cell.customWidth);
-              }
-              if (cell?.customHeight) {
-                rowHeights[r] = Math.max(rowHeights[r], cell.customHeight);
-              }
-            }
-          }
-          
-          totalWidth = colWidths.reduce((a, b) => a + b, 0);
-          totalHeight = rowHeights.reduce((a, b) => a + b, 0);
-          
           return {
             ...obj,
-            cells: updatedCells,
-            colWidths,
-            rowHeights,
-            width: Math.max(obj.width, totalWidth),
-            height: Math.max(obj.height, totalHeight)
+            cells: updatedCells
           };
         }
         return obj;
@@ -758,6 +813,20 @@ const SketchCanvas = () => {
     }
   };
   
+  // Handle cell media menu
+  const handleCellMediaMenu = (e, objId, row, col) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCellMediaMenu({
+      x: e.clientX,
+      y: e.clientY,
+      objId,
+      row,
+      col
+    });
+    setEditingCell({ objId, row, col });
+  };
+  
   const getBackgroundStyle = () => {
     const baseStyle = {
       backgroundColor: darkMode ? '#1e293b' : '#f1f5f9',
@@ -783,6 +852,37 @@ const SketchCanvas = () => {
     }
     
     return baseStyle;
+  };
+  
+  const renderNestedTable = (nestedTable, cellStyle) => {
+    return (
+      <table style={{
+        width: '100%',
+        height: '100%',
+        borderCollapse: 'collapse',
+        fontSize: '10px'
+      }}>
+        <tbody>
+          {nestedTable.cells.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((cell, ci) => (
+                <td
+                  key={ci}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '2px',
+                    fontSize: '10px',
+                    ...cellStyle
+                  }}
+                >
+                  {cell.text}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
   };
   
   const renderObject = (obj) => {
@@ -828,7 +928,10 @@ const SketchCanvas = () => {
             key={obj.id}
             style={{
               ...commonStyle,
-              backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+              backgroundColor: obj.backgroundColor || (darkMode ? '#334155' : '#e2e8f0'),
+              backgroundImage: obj.imageUrl ? `url(${obj.imageUrl})` : undefined,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -840,6 +943,21 @@ const SketchCanvas = () => {
             }}
             onDoubleClick={(e) => handleObjectDoubleClick(obj, e)}
           >
+            {obj.imageUrl && obj.text && (
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                padding: '4px',
+                fontSize: '12px',
+                textAlign: 'center'
+              }}>
+                {obj.text}
+              </div>
+            )}
             {renderResizeHandles()}
           </div>
         );
@@ -901,12 +1019,12 @@ const SketchCanvas = () => {
             key={obj.id}
             style={{
               ...commonStyle,
-              backgroundColor: 'transparent',
+              backgroundColor: obj.backgroundColor || 'transparent',
               border: isSelected ? '2px dashed #3b82f6' : 'none',
               padding: '8px',
-              fontSize: '16px',
+              fontSize: obj.fontSize || '16px',
               color: darkMode ? '#f1f5f9' : '#1e293b',
-              overflow: 'auto',
+              overflow: obj.overflow || 'auto',
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -967,6 +1085,7 @@ const SketchCanvas = () => {
                           setEditingCell({ objId: obj.id, row: ri, col: ci });
                         }}
                         onDoubleClick={(e) => handleCellResize(obj.id, ri, ci, e)}
+                        onContextMenu={(e) => handleCellMediaMenu(e, obj.id, ri, ci)}
                       >
                         {cell.image && (
                           <div style={{
@@ -1041,14 +1160,41 @@ const SketchCanvas = () => {
                             </div>
                           </div>
                         )}
+                        
                         {cell.video && (
-                          <video
-                            src={cell.video}
-                            controls
-                            style={{ maxWidth: '100%', maxHeight: '100%' }}
-                          />
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <video
+                              src={cell.video}
+                              controls
+                              style={{ 
+                                maxWidth: '100%', 
+                                maxHeight: '100%',
+                                cursor: 'pointer',
+                              }}
+                            />
+                          </div>
                         )}
-                        {!cell.image && !cell.video && (
+                        
+                        {cell.nestedTable && (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            overflow: 'auto',
+                          }}>
+                            {renderNestedTable(cell.nestedTable, {
+                              fontSize: '8px',
+                              padding: '1px'
+                            })}
+                          </div>
+                        )}
+                        
+                        {!cell.image && !cell.video && !cell.nestedTable && (
                           <div
                             contentEditable={editingCell?.objId === obj.id && editingCell?.row === ri && editingCell?.col === ci}
                             suppressContentEditableWarning
@@ -1060,11 +1206,30 @@ const SketchCanvas = () => {
                               outline: 'none',
                               minHeight: '20px',
                               color: darkMode ? '#f1f5f9' : '#1e293b',
+                              width: '100%',
+                              height: '100%',
                             }}
                           >
                             {cell.text}
                           </div>
                         )}
+                        
+                        <div style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          fontSize: '10px',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          backgroundColor: 'rgba(255,255,255,0.7)',
+                          padding: '1px 3px',
+                          borderRadius: '2px',
+                          display: 'none',
+                        }}
+                        className="cell-actions"
+                        >
+                          ⋮
+                        </div>
                       </td>
                     ))}
                   </tr>
@@ -1095,72 +1260,9 @@ const SketchCanvas = () => {
                 
                 <div style={{ marginBottom: '16px' }}>
                   <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: darkMode ? '#94a3b8' : '#64748b' }}>
-                    Click on a cell to edit text, or use buttons below to add media:
+                    Click on a cell to edit text, or right-click to add media:
                   </p>
                 </div>
-                
-                {editingCell?.objId === obj.id && (
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    <label style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}>
-                      <Image size={16} />
-                      Add Image
-                      <input
-                        type="file"
-                        accept="image/*,.gif"
-                        onChange={(e) => handleImageUpload(obj.id, editingCell.row, editingCell.col, e)}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
-                    
-                    <label style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#8b5cf6',
-                      color: 'white',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}>
-                      <Video size={16} />
-                      Add Video
-                      <input
-                        type="file"
-                        accept="video/*"
-                        onChange={(e) => handleVideoUpload(obj.id, editingCell.row, editingCell.col, e)}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
-                    
-                    <button
-                      onClick={() => {
-                        handleCellEdit(obj.id, editingCell.row, editingCell.col, { text: '', image: null, video: null });
-                      }}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                      }}
-                    >
-                      Clear Cell
-                    </button>
-                  </div>
-                )}
                 
                 <button
                   onClick={() => setShowTableEditor(null)}
@@ -1722,9 +1824,12 @@ const SketchCanvas = () => {
               Import
               <input
                 type="file"
-                accept=".json,.one,.txt,.html,.htm"
+                accept=".json,.one,.txt,.html,.htm,.mht"
                 onChange={(e) => {
-                  if (e.target.files[0]?.name.endsWith('.one')) {
+                  if (e.target.files[0]?.name.endsWith('.one') || 
+                      e.target.files[0]?.name.endsWith('.html') ||
+                      e.target.files[0]?.name.endsWith('.htm') ||
+                      e.target.files[0]?.name.endsWith('.mht')) {
                     importOneNote(e);
                   } else {
                     importCanvas(e);
@@ -1800,6 +1905,7 @@ const SketchCanvas = () => {
             setConnectingFrom(null);
             setShowTableEditor(null);
             setContextMenu(null);
+            setCellMediaMenu(null);
           }}
         >
           {/* Render connections */}
@@ -1890,7 +1996,7 @@ const SketchCanvas = () => {
         </div>
       </div>
       
-      {/* Context Menu */}
+      {/* Context Menu for Drawing Objects */}
       {contextMenu && (
         <div
           style={{
@@ -1908,7 +2014,10 @@ const SketchCanvas = () => {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <button
-              onClick={() => convertDrawingToText(contextMenu.objectId)}
+              onClick={() => {
+                convertDrawingToText(contextMenu.objectId);
+                setContextMenu(null);
+              }}
               style={{
                 padding: '8px 12px',
                 backgroundColor: 'transparent',
@@ -1928,7 +2037,10 @@ const SketchCanvas = () => {
             </button>
             <div style={{ height: '1px', backgroundColor: darkMode ? '#334155' : '#e2e8f0' }} />
             <button
-              onClick={() => convertDrawingToShape(contextMenu.objectId, 'rectangle')}
+              onClick={() => {
+                convertDrawingToShape(contextMenu.objectId, 'rectangle');
+                setContextMenu(null);
+              }}
               style={{
                 padding: '8px 12px',
                 backgroundColor: 'transparent',
@@ -1947,7 +2059,10 @@ const SketchCanvas = () => {
               Convert to Rectangle
             </button>
             <button
-              onClick={() => convertDrawingToShape(contextMenu.objectId, 'circle')}
+              onClick={() => {
+                convertDrawingToShape(contextMenu.objectId, 'circle');
+                setContextMenu(null);
+              }}
               style={{
                 padding: '8px 12px',
                 backgroundColor: 'transparent',
@@ -1966,7 +2081,10 @@ const SketchCanvas = () => {
               Convert to Circle
             </button>
             <button
-              onClick={() => convertDrawingToShape(contextMenu.objectId, 'triangle')}
+              onClick={() => {
+                convertDrawingToShape(contextMenu.objectId, 'triangle');
+                setContextMenu(null);
+              }}
               style={{
                 padding: '8px 12px',
                 backgroundColor: 'transparent',
@@ -1983,6 +2101,153 @@ const SketchCanvas = () => {
             >
               <Triangle size={14} />
               Convert to Triangle
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Context Menu for Cell Media */}
+      {cellMediaMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: cellMediaMenu.y,
+            left: cellMediaMenu.x,
+            backgroundColor: darkMode ? '#1e293b' : 'white',
+            border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+            borderRadius: '8px',
+            padding: '8px',
+            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            minWidth: '200px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', color: darkMode ? '#94a3b8' : '#64748b' }}>
+              Add to Cell
+            </h4>
+            
+            <label style={{
+              padding: '8px 12px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: darkMode ? '#f1f5f9' : '#1e293b',
+              cursor: 'pointer',
+              textAlign: 'left',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+            }}>
+              <Image size={14} />
+              Add Image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  handleImageUpload(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col, e);
+                  setCellMediaMenu(null);
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+            
+            <label style={{
+              padding: '8px 12px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: darkMode ? '#f1f5f9' : '#1e293b',
+              cursor: 'pointer',
+              textAlign: 'left',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+            }}>
+              <Video size={14} />
+              Add Video
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => {
+                  handleVideoUpload(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col, e);
+                  setCellMediaMenu(null);
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+            
+            <button
+              onClick={() => {
+                handleNestedTableAdd(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col);
+                setCellMediaMenu(null);
+              }}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Table size={14} />
+              Add Nested Table
+            </button>
+            
+            <div style={{ height: '1px', backgroundColor: darkMode ? '#334155' : '#e2e8f0', margin: '4px 0' }} />
+            
+            <button
+              onClick={() => {
+                handleCellEdit(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col, { 
+                  text: '', 
+                  image: null, 
+                  video: null, 
+                  nestedTable: null 
+                });
+                setCellMediaMenu(null);
+              }}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Trash2 size={14} />
+              Clear Cell
+            </button>
+            
+            <button
+              onClick={() => setCellMediaMenu(null)}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#64748b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                fontSize: '14px',
+                marginTop: '4px',
+              }}
+            >
+              Close
             </button>
           </div>
         </div>
