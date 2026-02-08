@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import Canvas from './components/Canvas';
@@ -7,9 +7,13 @@ import ContextMenus from './components/ContextMenus';
 import { useAuth } from './hooks/useAuth';
 import { useCanvas } from './hooks/useCanvas';
 import { useFileSystem } from './hooks/useFileSystem';
+import { useDarkMode } from './hooks/useDarkMode';
 
 const SketchCanvas = () => {
-  const canvasRef = useRef(null);
+  const canvasRef = React.useRef(null);
+  
+  // Dark mode
+  const { darkMode, setDarkMode } = useDarkMode();
   
   // Authentication
   const {
@@ -62,7 +66,6 @@ const SketchCanvas = () => {
     connections,
     connectingFrom,
     animations,
-    darkMode,
     backgroundPattern,
     showTableEditor,
     contextMenu,
@@ -77,7 +80,6 @@ const SketchCanvas = () => {
     setConnections,
     setConnectingFrom,
     setAnimations,
-    setDarkMode,
     setBackgroundPattern,
     setShowTableEditor,
     setContextMenu,
@@ -100,7 +102,7 @@ const SketchCanvas = () => {
   } = useCanvas(currentFile, files, setFiles, darkMode, canvasRef);
 
   // Sync canvas objects with current file
-  useEffect(() => {
+  React.useEffect(() => {
     if (currentFile && isAuthenticated) {
       const updatedFiles = files.map(f =>
         f.id === currentFile.id
