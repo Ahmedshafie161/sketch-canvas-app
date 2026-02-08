@@ -302,17 +302,15 @@ const ContextMenus = ({
         convertDrawingToShape={convertDrawingToShape}
       />
       
-      {cellMediaMenu && (
-        <CellMediaContextMenu
-          cellMediaMenu={cellMediaMenu}
-          setCellMediaMenu={setCellMediaMenu}
-          darkMode={darkMode}
-          handleImageUpload={handleImageUpload}
-          handleVideoUpload={handleVideoUpload}
-          handleNestedTableAdd={handleNestedTableAdd}
-          handleCellEdit={handleCellEdit}
-        />
-      )}
+      <CellMediaContextMenu
+        cellMediaMenu={cellMediaMenu}
+        setCellMediaMenu={setCellMediaMenu}
+        darkMode={darkMode}
+        handleImageUpload={handleImageUpload}
+        handleVideoUpload={handleVideoUpload}
+        handleNestedTableAdd={handleNestedTableAdd}
+        handleCellEdit={handleCellEdit}
+      />
     </>
   );
 };
