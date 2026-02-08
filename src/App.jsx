@@ -2210,7 +2210,128 @@ const SketchCanvas = () => {
             <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', color: darkMode ? '#94a3b8' : '#64748b' }}>
               Add to Cell
             </h4>
-            {/* ...existing code for cell media menu... */}
+            
+            <label style={{
+              padding: '8px 12px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: darkMode ? '#f1f5f9' : '#1e293b',
+              cursor: 'pointer',
+              textAlign: 'left',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+            }}>
+              <Image size={14} />
+              Add Image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  handleImageUpload(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col, e);
+                  setCellMediaMenu(null);
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+            
+            <label style={{
+              padding: '8px 12px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: darkMode ? '#f1f5f9' : '#1e293b',
+              cursor: 'pointer',
+              textAlign: 'left',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+            }}>
+              <Video size={14} />
+              Add Video
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => {
+                  handleVideoUpload(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col, e);
+                  setCellMediaMenu(null);
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+            
+            <button
+              onClick={() => {
+                handleNestedTableAdd(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col);
+                setCellMediaMenu(null);
+              }}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Table size={14} />
+              Add Nested Table
+            </button>
+            
+            <div style={{ height: '1px', backgroundColor: darkMode ? '#334155' : '#e2e8f0', margin: '4px 0' }} />
+            
+            <button
+              onClick={() => {
+                handleCellEdit(cellMediaMenu.objId, cellMediaMenu.row, cellMediaMenu.col, { 
+                  text: '', 
+                  image: null, 
+                  video: null, 
+                  nestedTable: null 
+                });
+                setCellMediaMenu(null);
+              }}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Trash2 size={14} />
+              Clear Cell
+            </button>
+            
+            <button
+              onClick={() => setCellMediaMenu(null)}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#64748b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                fontSize: '14px',
+                marginTop: '4px',
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
