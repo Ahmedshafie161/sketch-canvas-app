@@ -1568,10 +1568,12 @@ const SketchCanvas = () => {
   return (
     <div style={{
       height: '100vh',
+      width: '100vw',
       display: 'flex',
       backgroundColor: darkMode ? '#0f172a' : '#f8fafc',
       color: darkMode ? '#f1f5f9' : '#1e293b',
       transition: 'background-color 0.3s ease, color 0.3s ease',
+      overflow: 'hidden',
     }}>
       {/* Sidebar */}
       <div style={{
@@ -1953,28 +1955,42 @@ const SketchCanvas = () => {
         
         {/* Canvas */}
         <div
-          ref={canvasRef}
           style={{
             flex: 1,
             position: 'relative',
-            overflow: 'hidden',
-            cursor: selectedTool === 'draw' ? 'crosshair' : selectedTool === 'select' ? 'default' : 'crosshair',
-            ...getBackgroundStyle(),
-          }}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
-          onTouchStart={handleCanvasMouseDown}
-          onTouchMove={handleCanvasMouseMove}
-          onTouchEnd={handleCanvasMouseUp}
-          onClick={() => {
-            setSelectedObject(null);
-            setConnectingFrom(null);
-            setShowTableEditor(null);
-            setContextMenu(null);
-            setCellMediaMenu(null);
+            overflow: 'auto',
+            width: '100%',
+            height: '100%',
+            background: 'transparent',
           }}
         >
+          <div
+            ref={canvasRef}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: 5000,
+              height: 5000,
+              minWidth: '100vw',
+              minHeight: '100vh',
+              ...getBackgroundStyle(),
+              cursor: selectedTool === 'draw' ? 'crosshair' : selectedTool === 'select' ? 'default' : 'crosshair',
+            }}
+            onMouseDown={handleCanvasMouseDown}
+            onMouseMove={handleCanvasMouseMove}
+            onMouseUp={handleCanvasMouseUp}
+            onTouchStart={handleCanvasMouseDown}
+            onTouchMove={handleCanvasMouseMove}
+            onTouchEnd={handleCanvasMouseUp}
+            onClick={() => {
+              setSelectedObject(null);
+              setConnectingFrom(null);
+              setShowTableEditor(null);
+              setContextMenu(null);
+              setCellMediaMenu(null);
+            }}
+          >
           {/* Render connections */}
           <svg style={{
             position: 'absolute',
