@@ -19,28 +19,36 @@ import useUI from './components/hooks/useUI';
 import useCanvasRefs from './components/hooks/useCanvasRefs';
 import useAppEffects from './components/hooks/useAppEffects';
 import useCanvasUIHandlers from './hooks/useCanvasUIHandlers';
+import useAppState from './hooks/useAppState';
+import useTableHandlers from './hooks/useTableHandlers';
+import useCanvasHandlers from './hooks/useCanvasHandlers';
 import Toolbar from './components/ui/Toolbar';
+import { getConnectionPoints } from './utils/canvasUtils';
+import { exportCanvas, importCanvas } from './components/CanvasImportExport';
+
 
 const SketchCanvas = () => {
-  // Auth state
+  // App state
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState(null);
-  const auth = useAuth(setCurrentUser, setIsAuthenticated);
-
-  // Folder/file state
-  const foldersState = useFolders();
-  const { folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders, createFolder, createFile, openFile } = foldersState;
   const [currentFile, setCurrentFile] = React.useState(null);
 
-  // Canvas state
+  // Hooks
+  const auth = useAuth(setCurrentUser, setIsAuthenticated);
+  const foldersState = useFolders();
+  const { folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders, createFolder, createFile, openFile } = foldersState;
   const canvasState = useCanvas();
   const { canvasObjects, setCanvasObjects, selectedTool, setSelectedTool, selectedObject, setSelectedObject, isDrawing, setIsDrawing, drawingPath, setDrawingPath, connections, setConnections, connectingFrom, setConnectingFrom, animations, setAnimations, isPlaying, setIsPlaying } = canvasState;
-
-  // UI state
   const ui = useUI();
   const { darkMode, setDarkMode, backgroundPattern, setBackgroundPattern, showTableEditor, setShowTableEditor, resizingObject, setResizingObject, resizeHandle, setResizeHandle, editingCell, setEditingCell, cellMediaMenu, setCellMediaMenu } = ui;
+  const appState = useAppState();
+  const { contextMenu, setContextMenu, canvasOffset, setCanvasOffset, isPanning, setIsPanning, panStart, setPanStart, canvasScale, setCanvasScale } = appState;
+  const canvasRefs = useCanvasRefs();
+  const { canvasRef } = canvasRefs;
 
-  // UI handlers moved to hooks/useCanvasUIHandlers.js
+  // Handlers
+  const { handleConnect, deleteSelected } = useCanvasHandlers({ connectingFrom, setConnectingFrom, setConnections, connections, setCanvasObjects, canvasObjects, selectedObject, setSelectedObject });
+  const { handleObjectDoubleClick, handleCellEdit, handleImageUpload, handleVideoUpload, handleNestedTableAdd } = useTableHandlers({ setCanvasObjects, canvasObjects, setShowTableEditor });
   const {
     convertDrawingToText,
     convertDrawingToShape,
@@ -57,16 +65,55 @@ const SketchCanvas = () => {
     darkMode,
     backgroundPattern
   });
-  
-  // Render logic moved to components/RenderObject.jsx, components/RenderNestedTable.jsx, and components/RenderFileTree.jsx
-  // Use these components in place of the previous render functions
-  
+
+  // Placeholder handlers for missing logic
+  const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(null); localStorage.removeItem('canvasAuth'); };
+  const handleDragStart = () => {};
+  const handleDragOver = () => {};
+  const handleDrop = () => {};
+  const toggleFolder = () => {};
+  const deleteFolder = () => {};
+  const deleteFile = () => {};
+  const saveCurrentFile = () => {};
+  const importOneNote = () => {};
+  const handleCanvasMouseDown = () => {};
+  const handleCanvasMouseMove = () => {};
+  const handleCanvasMouseUp = () => {};
+
+  // Effects
+  useAppEffects({
+    canvasRef,
+    canvasScale,
+    setCanvasOffset,
+    setCanvasScale,
+    setIsPanning,
+    setPanStart,
+    setIsDrawing,
+    setDrawingPath,
+    setSelectedObject,
+    setConnectingFrom,
+    setShowTableEditor,
+    setContextMenu,
+    setCellMediaMenu,
+    isAuthenticated,
+    setCurrentUser,
+    setIsAuthenticated,
+    loadUserData: () => {},
+    darkMode,
+    setDarkMode,
+    folders,
+    files,
+    saveUserData: () => {},
+    currentFile,
+    canvasObjects,
+    connections,
+    animations
+  });
+
   if (!isAuthenticated) {
-    return (
-      <AuthForm />
-    );
+    return <AuthForm {...auth} />;
   }
-  
+
   return (
     <div className="app-root" style={{
       '--app-bg': darkMode ? '#0f172a' : '#f8fafc',
@@ -90,10 +137,7 @@ const SketchCanvas = () => {
         openFile={openFile}
         currentUser={currentUser}
       />
-      
-      {/* Main Area */}
       <div className="main-area">
-        {/* Toolbar */}
         <Toolbar
           selectedTool={selectedTool}
           setSelectedTool={setSelectedTool}
@@ -106,14 +150,12 @@ const SketchCanvas = () => {
           convertDrawingToShape={convertDrawingToShape}
           saveCurrentFile={saveCurrentFile}
           currentFile={currentFile}
-          exportCanvas={exportCanvas}
+          exportCanvas={() => exportCanvas(canvasObjects, connections, animations, currentFile)}
           importOneNote={importOneNote}
-          importCanvas={importCanvas}
+          importCanvas={(e) => importCanvas(e, setCanvasObjects, setConnections, setAnimations)}
           deleteSelected={deleteSelected}
           connectingFrom={connectingFrom}
         />
-        
-        {/* Canvas */}
         <div
           ref={canvasRef}
           className="canvas"
@@ -135,7 +177,6 @@ const SketchCanvas = () => {
             setCellMediaMenu(null);
           }}
         >
-          {/* Render connections */}
           <CanvasConnections
             connections={connections}
             canvasObjects={canvasObjects}
@@ -150,7 +191,6 @@ const SketchCanvas = () => {
             handleConnect={handleConnect}
             handleObjectDoubleClick={handleObjectDoubleClick}
           />
-          
           {isDrawing && drawingPath.length > 0 && (
             <svg
               style={{
@@ -170,12 +210,9 @@ const SketchCanvas = () => {
               />
             </svg>
           )}
-          
           {!currentFile && <NoFileSelected darkMode={darkMode} />}
         </div>
       </div>
-      
-      {/* Context Menu for Drawing Objects */}
       {contextMenu && (
         <ContextMenu
           contextMenu={contextMenu}
@@ -185,8 +222,6 @@ const SketchCanvas = () => {
           setContextMenu={setContextMenu}
         />
       )}
-
-      {/* Context Menu for Cell Media */}
       {cellMediaMenu && (
         <CellMediaMenu
           cellMediaMenu={cellMediaMenu}
