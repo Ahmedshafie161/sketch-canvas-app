@@ -1,10 +1,4 @@
-import { useState } from 'react';
-
-const useFolders = (setFiles, setCurrentFile, setCanvasObjects, setConnections, setAnimations) => {
-  const [folders, setFolders] = useState([]);
-  const [files, _setFiles] = useState([]);
-  const [expandedFolders, setExpandedFolders] = useState(new Set());
-
+const useFolders = ({ folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders, setCurrentFile, setCanvasObjects, setConnections, setAnimations }) => {
   const createFolder = (parentId = null) => {
     const name = prompt('Folder name:');
     if (name) {
