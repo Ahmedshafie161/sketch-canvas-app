@@ -122,9 +122,88 @@ const SketchCanvas = () => {
   };
   const saveCurrentFile = () => {};
   const importOneNote = () => {};
-  const handleCanvasMouseDown = () => {};
-  const handleCanvasMouseMove = () => {};
-  const handleCanvasMouseUp = () => {};
+  // Drawing state for new objects
+  const [drawStart, setDrawStart] = React.useState(null);
+
+  const handleCanvasMouseDown = (e) => {
+    if (["rectangle", "ellipse", "line", "arrow", "text", "table"].includes(selectedTool)) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left);
+      const y = (e.clientY - rect.top);
+      setDrawStart({ x, y });
+      setIsDrawing(true);
+    }
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!isDrawing || !drawStart) return;
+    // Optionally, show preview of shape being drawn
+  };
+
+  const handleCanvasMouseUp = (e) => {
+    if (!isDrawing || !drawStart) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x2 = (e.clientX - rect.left);
+    const y2 = (e.clientY - rect.top);
+    const x1 = drawStart.x;
+    const y1 = drawStart.y;
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
+    const left = Math.min(x1, x2);
+    const top = Math.min(y1, y2);
+    let newObj = null;
+    if (["rectangle", "ellipse", "line", "arrow", "text", "table"].includes(selectedTool) && width > 5 && height > 5) {
+      const id = Date.now() + Math.random();
+      if (selectedTool === "rectangle" || selectedTool === "ellipse") {
+        newObj = {
+          id,
+          type: selectedTool,
+          x: left,
+          y: top,
+          width,
+          height,
+          text: "",
+        };
+      } else if (selectedTool === "line" || selectedTool === "arrow") {
+        newObj = {
+          id,
+          type: selectedTool,
+          x1,
+          y1,
+          x2,
+          y2,
+        };
+      } else if (selectedTool === "text") {
+        newObj = {
+          id,
+          type: "text",
+          x: left,
+          y: top,
+          width,
+          height,
+          text: "Double-click to edit",
+        };
+      } else if (selectedTool === "table") {
+        newObj = {
+          id,
+          type: "table",
+          x: left,
+          y: top,
+          width,
+          height,
+          rows: 2,
+          cols: 2,
+          cells: [
+            [ { text: "" }, { text: "" } ],
+            [ { text: "" }, { text: "" } ]
+          ],
+        };
+      }
+      if (newObj) setCanvasObjects(prev => [...prev, newObj]);
+    }
+    setIsDrawing(false);
+    setDrawStart(null);
+  };
 
   // Effects
   useAppEffects({
