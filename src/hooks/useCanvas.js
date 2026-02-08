@@ -44,6 +44,7 @@ export const useCanvas = (currentFile, files, setFiles, darkMode, canvasRef) => 
   }, [currentFile]);
 
   const getCanvasCoords = (e) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
     let x, y;
 
