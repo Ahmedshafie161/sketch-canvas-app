@@ -38,14 +38,25 @@ const SketchCanvas = () => {
   const [files, setFiles] = React.useState([]);
   const [expandedFolders, setExpandedFolders] = React.useState(new Set());
   const [canvasObjects, setCanvasObjects] = React.useState([]);
+  const [selectedTool, setSelectedTool] = React.useState('select');
+  const [selectedObject, setSelectedObject] = React.useState(null);
+  const [isDrawing, setIsDrawing] = React.useState(false);
+  const [drawingPath, setDrawingPath] = React.useState([]);
   const [connections, setConnections] = React.useState([]);
+  const [connectingFrom, setConnectingFrom] = React.useState(null);
   const [animations, setAnimations] = React.useState([]);
+  const [isPlaying, setIsPlaying] = React.useState(false);
   const auth = useAuth(setCurrentUser, setIsAuthenticated);
-  const foldersState = useFolders(setFiles, setCurrentFile, setCanvasObjects, setConnections, setAnimations);
-  // Use foldersState for createFolder, createFile, openFile
+  const foldersState = useFolders({
+    folders, setFolders, files, setFiles, expandedFolders, setExpandedFolders,
+    setCurrentFile, setCanvasObjects, setConnections, setAnimations
+  });
   const { createFolder, createFile, openFile } = foldersState;
-  const canvasState = useCanvas();
-  const { selectedTool, setSelectedTool, selectedObject, setSelectedObject, isDrawing, setIsDrawing, drawingPath, setDrawingPath, connectingFrom, setConnectingFrom, isPlaying, setIsPlaying } = canvasState;
+  const canvasState = useCanvas({
+    canvasObjects, setCanvasObjects, selectedTool, setSelectedTool, selectedObject, setSelectedObject,
+    isDrawing, setIsDrawing, drawingPath, setDrawingPath, connections, setConnections,
+    connectingFrom, setConnectingFrom, animations, setAnimations, isPlaying, setIsPlaying
+  });
   const ui = useUI();
   const { darkMode, setDarkMode, backgroundPattern, setBackgroundPattern, showTableEditor, setShowTableEditor, resizingObject, setResizingObject, resizeHandle, setResizeHandle, editingCell, setEditingCell, cellMediaMenu, setCellMediaMenu } = ui;
   const appState = useAppState();
