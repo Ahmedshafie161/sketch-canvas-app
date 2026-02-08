@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Square, Circle, Triangle, Table, Pencil, FolderPlus, File, Save, LogOut, Trash2, Download, Upload, Wand2, Type, ChevronRight, ChevronDown, Move, Edit3, Link } from 'lucide-react';
+import { Plus, Square, Circle, Triangle, Table, Pencil, FolderPlus, File, Save, LogOut, Trash2, Download, Upload, Wand2, Type, ChevronRight, ChevronDown, Move, Edit3, Link, Play, Moon, Sun, Grid3x3, Minus as LineIcon, X, Settings } from 'lucide-react';
 
 const SketchCanvas = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -20,6 +20,14 @@ const SketchCanvas = () => {
   const [drawingPath, setDrawingPath] = useState([]);
   const [connections, setConnections] = useState([]);
   const [connectingFrom, setConnectingFrom] = useState(null);
+  const [animations, setAnimations] = useState([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  
+  const [darkMode, setDarkMode] = useState(false);
+  const [backgroundPattern, setBackgroundPattern] = useState('grid'); // 'grid', 'lines', 'none'
+  const [showTableEditor, setShowTableEditor] = useState(null);
+  const [resizingObject, setResizingObject] = useState(null);
+  const [resizeHandle, setResizeHandle] = useState(null);
   
   const canvasRef = useRef(null);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -33,6 +41,11 @@ const SketchCanvas = () => {
       setCurrentUser(user);
       setIsAuthenticated(true);
       loadUserData(user);
+    }
+    
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode));
     }
   }, []);
   
@@ -60,17 +73,20 @@ const SketchCanvas = () => {
     }
   }, [folders, files]);
   
-  // Auto-save current file whenever canvas changes
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+  
   useEffect(() => {
     if (currentFile && isAuthenticated) {
       const updatedFiles = files.map(f => 
         f.id === currentFile.id 
-          ? { ...f, objects: canvasObjects, connections: connections } 
+          ? { ...f, objects: canvasObjects, connections: connections, animations: animations } 
           : f
       );
       setFiles(updatedFiles);
     }
-  }, [canvasObjects, connections]);
+  }, [canvasObjects, connections, animations]);
   
   const handleAuth = (e) => {
     e.preventDefault();
@@ -127,12 +143,14 @@ const SketchCanvas = () => {
         folderId,
         objects: [],
         connections: [],
+        animations: [],
         createdAt: new Date().toISOString(),
       };
       setFiles([...files, newFile]);
       setCurrentFile(newFile);
       setCanvasObjects([]);
       setConnections([]);
+      setAnimations([]);
     }
   };
   
@@ -140,6 +158,7 @@ const SketchCanvas = () => {
     setCurrentFile(file);
     setCanvasObjects(file.objects || []);
     setConnections(file.connections || []);
+    setAnimations(file.animations || []);
     setSelectedObject(null);
   };
   
@@ -249,6 +268,14 @@ const SketchCanvas = () => {
   const handleCanvasMouseDown = (e) => {
     const coords = getCanvasCoords(e);
     
+    // Check for resize handle
+    const resizeInfo = getResizeHandle(coords);
+    if (resizeInfo && selectedTool === 'select') {
+      setResizingObject(resizeInfo.object);
+      setResizeHandle(resizeInfo.handle);
+      return;
+    }
+    
     if (selectedTool === 'select') {
       const clicked = canvasObjects.find(obj => isPointInObject(coords, obj));
       setSelectedObject(clicked || null);
@@ -267,6 +294,7 @@ const SketchCanvas = () => {
               id: Date.now(),
               from: connectingFrom.id,
               to: clicked.id,
+              type: 'arrow',
             };
             setConnections([...connections, newConnection]);
           }
@@ -283,8 +311,88 @@ const SketchCanvas = () => {
     }
   };
   
+  const getResizeHandle = (point) => {
+    if (!selectedObject) return null;
+    
+    const obj = selectedObject;
+    const handleSize = 8;
+    
+    const handles = [];
+    
+    if (obj.type === 'circle') {
+      const right = obj.x + obj.radius * 2;
+      const bottom = obj.y + obj.radius * 2;
+      
+      handles.push(
+        { x: right, y: bottom, handle: 'se' },
+        { x: obj.x, y: bottom, handle: 'sw' },
+        { x: right, y: obj.y, handle: 'ne' },
+        { x: obj.x, y: obj.y, handle: 'nw' }
+      );
+    } else if (obj.width && obj.height) {
+      const right = obj.x + obj.width;
+      const bottom = obj.y + obj.height;
+      
+      handles.push(
+        { x: right, y: bottom, handle: 'se' },
+        { x: obj.x, y: bottom, handle: 'sw' },
+        { x: right, y: obj.y, handle: 'ne' },
+        { x: obj.x, y: obj.y, handle: 'nw' }
+      );
+    }
+    
+    for (const h of handles) {
+      if (Math.abs(point.x - h.x) < handleSize && Math.abs(point.y - h.y) < handleSize) {
+        return { object: obj, handle: h.handle };
+      }
+    }
+    
+    return null;
+  };
+  
   const handleCanvasMouseMove = (e) => {
-    if (isDrawing && selectedTool === 'draw') {
+    const coords = getCanvasCoords(e);
+    
+    if (resizingObject && resizeHandle) {
+      const obj = resizingObject;
+      const newObjects = canvasObjects.map(o => {
+        if (o.id !== obj.id) return o;
+        
+        if (o.type === 'circle') {
+          const newRadius = Math.max(20, Math.abs(coords.x - o.x) / 2);
+          return { ...o, radius: newRadius };
+        } else if (o.width !== undefined && o.height !== undefined) {
+          let newWidth = o.width;
+          let newHeight = o.height;
+          let newX = o.x;
+          let newY = o.y;
+          
+          if (resizeHandle.includes('e')) {
+            newWidth = Math.max(30, coords.x - o.x);
+          }
+          if (resizeHandle.includes('w')) {
+            newWidth = Math.max(30, o.x + o.width - coords.x);
+            newX = coords.x;
+          }
+          if (resizeHandle.includes('s')) {
+            newHeight = Math.max(30, coords.y - o.y);
+          }
+          if (resizeHandle.includes('n')) {
+            newHeight = Math.max(30, o.y + o.height - coords.y);
+            newY = coords.y;
+          }
+          
+          return { ...o, width: newWidth, height: newHeight, x: newX, y: newY };
+        }
+        return o;
+      });
+      
+      setCanvasObjects(newObjects);
+      const updated = newObjects.find(o => o.id === obj.id);
+      setResizingObject(updated);
+      setSelectedObject(updated);
+      
+    } else if (isDrawing && selectedTool === 'draw') {
       const coords = getCanvasCoords(e);
       setDrawingPath([...drawingPath, coords]);
     } else if (isDraggingObject && selectedObject && selectedTool === 'select') {
@@ -316,6 +424,8 @@ const SketchCanvas = () => {
       setIsDrawing(false);
     }
     setIsDraggingObject(false);
+    setResizingObject(null);
+    setResizeHandle(null);
   };
   
   const isPointInObject = (point, obj) => {
@@ -329,6 +439,9 @@ const SketchCanvas = () => {
     } else if (obj.type === 'circle') {
       return point.x >= obj.x && point.x <= obj.x + obj.radius * 2 &&
              point.y >= obj.y && point.y <= obj.y + obj.radius * 2;
+    } else if (obj.type === 'table') {
+      return point.x >= obj.x && point.x <= obj.x + (obj.cols * obj.cellWidth) &&
+             point.y >= obj.y && point.y <= obj.y + (obj.rows * obj.cellHeight);
     }
     return point.x >= obj.x && point.x <= obj.x + (obj.width || 0) &&
            point.y >= obj.y && point.y <= obj.y + (obj.height || 0);
@@ -371,6 +484,63 @@ const SketchCanvas = () => {
     }
   };
   
+  const analyzeDrawingShape = (path) => {
+    const bounds = getPathBounds(path);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const aspectRatio = width / height;
+    
+    // Check if it's roughly circular
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    const avgRadius = (width + height) / 4;
+    
+    let circleScore = 0;
+    path.forEach(p => {
+      const dist = Math.sqrt(Math.pow(p.x - centerX, 2) + Math.pow(p.y - centerY, 2));
+      if (Math.abs(dist - avgRadius) < avgRadius * 0.3) circleScore++;
+    });
+    
+    if (circleScore / path.length > 0.7) {
+      return 'circle';
+    }
+    
+    // Check for triangle (3 corners)
+    const corners = findCorners(path);
+    if (corners.length === 3) {
+      return 'triangle';
+    }
+    
+    // Check if square
+    if (aspectRatio > 0.8 && aspectRatio < 1.2) {
+      return 'square';
+    }
+    
+    return 'rectangle';
+  };
+  
+  const findCorners = (path) => {
+    // Simple corner detection
+    const corners = [];
+    const threshold = 45; // degrees
+    
+    for (let i = 1; i < path.length - 1; i++) {
+      const p1 = path[i - 1];
+      const p2 = path[i];
+      const p3 = path[i + 1];
+      
+      const angle1 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const angle2 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
+      const angleDiff = Math.abs(angle1 - angle2) * 180 / Math.PI;
+      
+      if (angleDiff > threshold && angleDiff < 180 - threshold) {
+        corners.push(p2);
+      }
+    }
+    
+    return corners;
+  };
+  
   const convertDrawingToShape = () => {
     const lastDrawing = [...canvasObjects].reverse().find(obj => obj.type === 'drawing');
     if (!lastDrawing) {
@@ -379,20 +549,60 @@ const SketchCanvas = () => {
     }
     
     const bounds = getPathBounds(lastDrawing.path);
+    const shapeType = analyzeDrawingShape(lastDrawing.path);
     
-    const newShape = {
-      id: Date.now(),
-      type: 'rectangle',
-      x: bounds.minX,
-      y: bounds.minY,
-      width: bounds.maxX - bounds.minX,
-      height: bounds.maxY - bounds.minY,
-      color: '#a78bfa',
-      text: '',
-    };
+    let newShape;
+    
+    if (shapeType === 'circle') {
+      const radius = (bounds.maxX - bounds.minX) / 2;
+      newShape = {
+        id: Date.now(),
+        type: 'circle',
+        x: bounds.minX,
+        y: bounds.minY,
+        radius: radius,
+        color: '#a78bfa',
+        text: '',
+      };
+    } else if (shapeType === 'triangle') {
+      newShape = {
+        id: Date.now(),
+        type: 'triangle',
+        x: bounds.minX,
+        y: bounds.minY,
+        width: bounds.maxX - bounds.minX,
+        height: bounds.maxY - bounds.minY,
+        color: '#fbbf24',
+        text: '',
+      };
+    } else if (shapeType === 'square') {
+      const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+      newShape = {
+        id: Date.now(),
+        type: 'square',
+        x: bounds.minX,
+        y: bounds.minY,
+        width: size,
+        height: size,
+        color: '#34d399',
+        text: '',
+      };
+    } else {
+      newShape = {
+        id: Date.now(),
+        type: 'rectangle',
+        x: bounds.minX,
+        y: bounds.minY,
+        width: bounds.maxX - bounds.minX,
+        height: bounds.maxY - bounds.minY,
+        color: '#60a5fa',
+        text: '',
+      };
+    }
     
     const filtered = canvasObjects.filter(obj => obj.id !== lastDrawing.id);
     setCanvasObjects([...filtered, newShape]);
+    alert(`Drawing converted to ${shapeType}!`);
   };
   
   const convertDrawingToText = () => {
@@ -412,8 +622,6 @@ const SketchCanvas = () => {
       type: 'text',
       x: bounds.minX,
       y: bounds.minY,
-      width: bounds.maxX - bounds.minX,
-      height: bounds.maxY - bounds.minY,
       text,
       fontSize: 24,
       color: '#000000',
@@ -440,6 +648,7 @@ const SketchCanvas = () => {
       setConnections(connections.filter(conn => 
         conn.from !== selectedObject.id && conn.to !== selectedObject.id
       ));
+      setAnimations(animations.filter(anim => anim.objectId !== selectedObject.id));
       setSelectedObject(null);
     }
   };
@@ -456,10 +665,172 @@ const SketchCanvas = () => {
     }
   };
   
+  const addAnimation = () => {
+    if (!selectedObject) {
+      alert('Please select an object first!');
+      return;
+    }
+    
+    const order = prompt('Enter animation order (e.g., 1, 2, 3):', '1');
+    const duration = prompt('Enter duration in seconds:', '1');
+    
+    if (order && duration) {
+      const newAnim = {
+        id: Date.now(),
+        objectId: selectedObject.id,
+        order: parseInt(order),
+        duration: parseFloat(duration),
+      };
+      
+      setAnimations([...animations.filter(a => a.objectId !== selectedObject.id), newAnim]);
+    }
+  };
+  
+  const playAnimations = () => {
+    setIsPlaying(true);
+    const sortedAnims = [...animations].sort((a, b) => a.order - b.order);
+    
+    // Hide all animated objects initially
+    const animatedIds = new Set(sortedAnims.map(a => a.objectId));
+    setCanvasObjects(canvasObjects.map(obj => ({
+      ...obj,
+      hidden: animatedIds.has(obj.id)
+    })));
+    
+    // Show them one by one
+    let delay = 0;
+    sortedAnims.forEach(anim => {
+      setTimeout(() => {
+        setCanvasObjects(prev => prev.map(obj => 
+          obj.id === anim.objectId ? { ...obj, hidden: false } : obj
+        ));
+      }, delay * 1000);
+      
+      delay += anim.duration;
+    });
+    
+    setTimeout(() => {
+      setIsPlaying(false);
+    }, delay * 1000);
+  };
+  
+  const editTableCell = (tableObj, cellIndex) => {
+    const cell = tableObj.cells[cellIndex];
+    
+    const action = prompt('Choose action:\n1. Add text\n2. Add image URL\n3. Add video URL\n4. Add GIF URL\n5. Add nested table\n6. Clear cell', '1');
+    
+    let updatedCell = { ...cell };
+    
+    switch(action) {
+      case '1':
+        const text = prompt('Enter text:', cell.content);
+        if (text !== null) updatedCell.content = text;
+        break;
+      case '2':
+        const imgUrl = prompt('Enter image URL:');
+        if (imgUrl) updatedCell.media = { type: 'image', url: imgUrl };
+        break;
+      case '3':
+        const vidUrl = prompt('Enter video URL:');
+        if (vidUrl) updatedCell.media = { type: 'video', url: vidUrl };
+        break;
+      case '4':
+        const gifUrl = prompt('Enter GIF URL:');
+        if (gifUrl) updatedCell.media = { type: 'gif', url: gifUrl };
+        break;
+      case '5':
+        const rows = prompt('Nested table rows:', '2');
+        const cols = prompt('Nested table columns:', '2');
+        if (rows && cols) {
+          updatedCell.nestedTable = {
+            rows: parseInt(rows),
+            cols: parseInt(cols),
+            cells: Array(parseInt(rows) * parseInt(cols)).fill(null).map(() => ({ content: '' }))
+          };
+        }
+        break;
+      case '6':
+        updatedCell = { id: cellIndex, content: '', media: null, nestedTable: null };
+        break;
+    }
+    
+    const newCells = [...tableObj.cells];
+    newCells[cellIndex] = updatedCell;
+    
+    setCanvasObjects(canvasObjects.map(obj => 
+      obj.id === tableObj.id ? { ...obj, cells: newCells } : obj
+    ));
+  };
+  
+  const addTableRow = (tableObj) => {
+    const newCells = [...tableObj.cells];
+    for (let i = 0; i < tableObj.cols; i++) {
+      newCells.push({ id: newCells.length, content: '', media: null, nestedTable: null });
+    }
+    
+    setCanvasObjects(canvasObjects.map(obj => 
+      obj.id === tableObj.id 
+        ? { ...obj, rows: obj.rows + 1, cells: newCells }
+        : obj
+    ));
+  };
+  
+  const addTableColumn = (tableObj) => {
+    const newCells = [];
+    for (let i = 0; i < tableObj.rows; i++) {
+      for (let j = 0; j < tableObj.cols; j++) {
+        newCells.push(tableObj.cells[i * tableObj.cols + j]);
+      }
+      newCells.push({ id: newCells.length, content: '', media: null, nestedTable: null });
+    }
+    
+    setCanvasObjects(canvasObjects.map(obj => 
+      obj.id === tableObj.id 
+        ? { ...obj, cols: obj.cols + 1, cells: newCells }
+        : obj
+    ));
+  };
+  
+  const deleteTableRow = (tableObj) => {
+    if (tableObj.rows <= 1) {
+      alert('Cannot delete the last row!');
+      return;
+    }
+    
+    const newCells = tableObj.cells.slice(0, -tableObj.cols);
+    
+    setCanvasObjects(canvasObjects.map(obj => 
+      obj.id === tableObj.id 
+        ? { ...obj, rows: obj.rows - 1, cells: newCells }
+        : obj
+    ));
+  };
+  
+  const deleteTableColumn = (tableObj) => {
+    if (tableObj.cols <= 1) {
+      alert('Cannot delete the last column!');
+      return;
+    }
+    
+    const newCells = [];
+    for (let i = 0; i < tableObj.rows; i++) {
+      for (let j = 0; j < tableObj.cols - 1; j++) {
+        newCells.push(tableObj.cells[i * tableObj.cols + j]);
+      }
+    }
+    
+    setCanvasObjects(canvasObjects.map(obj => 
+      obj.id === tableObj.id 
+        ? { ...obj, cols: obj.cols - 1, cells: newCells }
+        : obj
+    ));
+  };
+  
   const exportCanvas = () => {
     const dataStr = JSON.stringify({ 
       objects: canvasObjects,
-      connections: connections 
+      connections: connections,
+      animations: animations
     }, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -479,12 +850,25 @@ const SketchCanvas = () => {
         const data = JSON.parse(event.target.result);
         setCanvasObjects(data.objects || []);
         setConnections(data.connections || []);
+        setAnimations(data.animations || []);
         alert('Canvas imported successfully!');
       } catch (err) {
         alert('Invalid file format');
       }
     };
     reader.readAsText(file);
+  };
+  
+  const importOneNote = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.one')) {
+      alert('Please select a OneNote (.one) file');
+      return;
+    }
+    
+    alert('OneNote import coming soon! For now, export your OneNote as HTML or PDF, then import as JSON.');
   };
   
   const getConnectionPoints = (obj) => {
@@ -498,6 +882,11 @@ const SketchCanvas = () => {
         x: obj.x + obj.width / 2,
         y: obj.y + obj.height / 2,
       };
+    } else if (obj.type === 'table') {
+      return {
+        x: obj.x + (obj.cols * obj.cellWidth) / 2,
+        y: obj.y + (obj.rows * obj.cellHeight) / 2,
+      };
     }
     return {
       x: obj.x + (obj.width || 0) / 2,
@@ -505,7 +894,54 @@ const SketchCanvas = () => {
     };
   };
   
+  const renderResizeHandles = (obj) => {
+    if (!selectedObject || selectedObject.id !== obj.id || selectedTool !== 'select') return null;
+    
+    const handles = [];
+    
+    if (obj.type === 'circle') {
+      const right = obj.x + obj.radius * 2;
+      const bottom = obj.y + obj.radius * 2;
+      
+      handles.push(
+        { x: right, y: bottom },
+        { x: obj.x, y: bottom },
+        { x: right, y: obj.y },
+        { x: obj.x, y: obj.y }
+      );
+    } else if (obj.width && obj.height) {
+      const right = obj.x + obj.width;
+      const bottom = obj.y + obj.height;
+      
+      handles.push(
+        { x: right, y: bottom },
+        { x: obj.x, y: bottom },
+        { x: right, y: obj.y },
+        { x: obj.x, y: obj.y }
+      );
+    }
+    
+    return handles.map((h, i) => (
+      <div
+        key={i}
+        style={{
+          position: 'absolute',
+          left: h.x - 4,
+          top: h.y - 4,
+          width: 8,
+          height: 8,
+          backgroundColor: '#3b82f6',
+          border: '1px solid white',
+          cursor: 'nwse-resize',
+          zIndex: 1000,
+        }}
+      />
+    ));
+  };
+  
   const renderObject = (obj) => {
+    if (obj.hidden) return null;
+    
     const isSelected = selectedObject?.id === obj.id;
     const style = {
       position: 'absolute',
@@ -518,7 +954,7 @@ const SketchCanvas = () => {
       justifyContent: 'center',
       fontSize: '14px',
       fontWeight: '500',
-      color: '#1f2937',
+      color: darkMode ? '#f1f5f9' : '#1f2937',
       textAlign: 'center',
       padding: '4px',
       wordWrap: 'break-word',
@@ -530,140 +966,183 @@ const SketchCanvas = () => {
       case 'rectangle':
       case 'square':
         return (
-          <div
-            key={obj.id}
-            style={{
-              ...style,
-              width: obj.width,
-              height: obj.height,
-              backgroundColor: obj.color,
-              borderRadius: '4px',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedObject(obj);
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              editObjectText(obj);
-            }}
-          >
-            {obj.text}
-          </div>
+          <React.Fragment key={obj.id}>
+            <div
+              style={{
+                ...style,
+                width: obj.width,
+                height: obj.height,
+                backgroundColor: obj.color,
+                borderRadius: '4px',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedObject(obj);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                editObjectText(obj);
+              }}
+            >
+              {obj.text}
+            </div>
+            {renderResizeHandles(obj)}
+          </React.Fragment>
         );
       
       case 'circle':
         return (
-          <div
-            key={obj.id}
-            style={{
-              ...style,
-              width: obj.radius * 2,
-              height: obj.radius * 2,
-              backgroundColor: obj.color,
-              borderRadius: '50%',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedObject(obj);
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              editObjectText(obj);
-            }}
-          >
-            {obj.text}
-          </div>
+          <React.Fragment key={obj.id}>
+            <div
+              style={{
+                ...style,
+                width: obj.radius * 2,
+                height: obj.radius * 2,
+                backgroundColor: obj.color,
+                borderRadius: '50%',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedObject(obj);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                editObjectText(obj);
+              }}
+            >
+              {obj.text}
+            </div>
+            {renderResizeHandles(obj)}
+          </React.Fragment>
         );
       
       case 'triangle':
         return (
-          <div
-            key={obj.id}
-            style={{
-              position: 'absolute',
-              left: obj.x,
-              top: obj.y,
-              width: obj.width,
-              height: obj.height,
-              cursor: 'pointer',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedObject(obj);
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              editObjectText(obj);
-            }}
-          >
-            <svg width={obj.width} height={obj.height}>
-              <polygon
-                points={`${obj.width/2},0 ${obj.width},${obj.height} 0,${obj.height}`}
-                fill={obj.color}
-                stroke={isSelected ? '#3b82f6' : 'none'}
-                strokeWidth="2"
-              />
-              <text
-                x={obj.width/2}
-                y={obj.height * 0.65}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="14"
-                fontWeight="500"
-                fill="#1f2937"
-              >
-                {obj.text}
-              </text>
-            </svg>
-          </div>
+          <React.Fragment key={obj.id}>
+            <div
+              style={{
+                position: 'absolute',
+                left: obj.x,
+                top: obj.y,
+                width: obj.width,
+                height: obj.height,
+                cursor: 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedObject(obj);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                editObjectText(obj);
+              }}
+            >
+              <svg width={obj.width} height={obj.height}>
+                <polygon
+                  points={`${obj.width/2},0 ${obj.width},${obj.height} 0,${obj.height}`}
+                  fill={obj.color}
+                  stroke={isSelected ? '#3b82f6' : 'none'}
+                  strokeWidth="2"
+                />
+                <text
+                  x={obj.width/2}
+                  y={obj.height * 0.65}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="14"
+                  fontWeight="500"
+                  fill={darkMode ? '#f1f5f9' : '#1f2937'}
+                >
+                  {obj.text}
+                </text>
+              </svg>
+            </div>
+            {renderResizeHandles(obj)}
+          </React.Fragment>
         );
       
       case 'table':
         return (
-          <div
-            key={obj.id}
-            style={{
-              ...style,
-              display: 'grid',
-              gridTemplateColumns: `repeat(${obj.cols}, ${obj.cellWidth}px)`,
-              gap: '1px',
-              backgroundColor: '#e5e7eb',
-              padding: '1px',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedObject(obj);
-            }}
-          >
-            {obj.cells.map((cell, i) => (
-              <div
-                key={i}
-                style={{
-                  width: obj.cellWidth,
-                  height: obj.cellHeight,
-                  backgroundColor: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  overflow: 'hidden',
-                }}
-              >
-                {cell.media && (
-                  cell.media.type === 'image' ? (
-                    <img src={cell.media.url} style={{ maxWidth: '100%', maxHeight: '100%' }} alt="" />
-                  ) : cell.media.type === 'video' ? (
-                    <video src={cell.media.url} style={{ maxWidth: '100%', maxHeight: '100%' }} controls />
-                  ) : cell.media.type === 'gif' ? (
-                    <img src={cell.media.url} style={{ maxWidth: '100%', maxHeight: '100%' }} alt="" />
-                  ) : null
-                )}
-                {!cell.media && cell.content}
-                {cell.nestedTable && <span style={{ fontSize: '10px' }}>📊</span>}
+          <React.Fragment key={obj.id}>
+            <div
+              style={{
+                ...style,
+                display: 'grid',
+                gridTemplateColumns: `repeat(${obj.cols}, ${obj.cellWidth}px)`,
+                gap: '1px',
+                backgroundColor: darkMode ? '#475569' : '#e5e7eb',
+                padding: '1px',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedObject(obj);
+                setShowTableEditor(obj.id);
+              }}
+            >
+              {obj.cells.map((cell, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: obj.cellWidth,
+                    height: obj.cellHeight,
+                    backgroundColor: darkMode ? '#1e293b' : 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    editTableCell(obj, i);
+                  }}
+                >
+                  {cell.media && (
+                    cell.media.type === 'image' ? (
+                      <img src={cell.media.url} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="" />
+                    ) : cell.media.type === 'video' ? (
+                      <video src={cell.media.url} style={{ maxWidth: '100%', maxHeight: '100%' }} controls />
+                    ) : cell.media.type === 'gif' ? (
+                      <img src={cell.media.url} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="" />
+                    ) : null
+                  )}
+                  {!cell.media && !cell.nestedTable && cell.content}
+                  {cell.nestedTable && (
+                    <div style={{ fontSize: '10px', display: 'grid', gridTemplateColumns: `repeat(${cell.nestedTable.cols}, 1fr)`, gap: '1px', width: '90%', height: '90%' }}>
+                      {cell.nestedTable.cells.map((nc, ni) => (
+                        <div key={ni} style={{ border: '1px solid #cbd5e1', padding: '2px', fontSize: '8px' }}>
+                          {nc.content}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {renderResizeHandles(obj)}
+            {showTableEditor === obj.id && (
+              <div style={{
+                position: 'absolute',
+                left: obj.x + (obj.cols * obj.cellWidth) + 10,
+                top: obj.y,
+                backgroundColor: darkMode ? '#1e293b' : 'white',
+                border: `1px solid ${darkMode ? '#475569' : '#e5e7eb'}`,
+                borderRadius: '8px',
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                zIndex: 1000,
+              }}>
+                <button onClick={() => addTableRow(obj)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px' }}>+ Row</button>
+                <button onClick={() => addTableColumn(obj)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px' }}>+ Column</button>
+                <button onClick={() => deleteTableRow(obj)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px' }}>- Row</button>
+                <button onClick={() => deleteTableColumn(obj)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px' }}>- Column</button>
+                <button onClick={() => setShowTableEditor(null)} style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#64748b', color: 'white', border: 'none', borderRadius: '4px' }}>Close</button>
               </div>
-            ))}
-          </div>
+            )}
+          </React.Fragment>
         );
       
       case 'drawing':
@@ -734,7 +1213,7 @@ const SketchCanvas = () => {
                 paddingLeft: `${depth * 1.5}rem`,
                 padding: '0.625rem',
                 paddingLeft: `${0.625 + depth * 1.5}rem`,
-                backgroundColor: '#334155',
+                backgroundColor: darkMode ? '#334155' : '#e2e8f0',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -791,7 +1270,9 @@ const SketchCanvas = () => {
               paddingLeft: `${depth * 1.5}rem`,
               padding: '0.5rem',
               paddingLeft: `${0.5 + depth * 1.5}rem`,
-              backgroundColor: currentFile?.id === file.id ? '#3b82f6' : '#475569',
+              backgroundColor: currentFile?.id === file.id 
+                ? (darkMode ? '#3b82f6' : '#60a5fa')
+                : (darkMode ? '#475569' : '#cbd5e1'),
               borderRadius: '6px',
               marginBottom: '0.25rem',
               marginLeft: `${depth > 0 ? '1.5rem' : '0'}`,
@@ -813,6 +1294,32 @@ const SketchCanvas = () => {
         ))}
       </>
     );
+  };
+  
+  const getBackgroundStyle = () => {
+    const baseColor = darkMode ? '#1e293b' : '#f8fafc';
+    const lineColor = darkMode ? '#334155' : '#e2e8f0';
+    
+    if (backgroundPattern === 'grid') {
+      return {
+        backgroundColor: baseColor,
+        backgroundImage: `
+          linear-gradient(${lineColor} 1px, transparent 1px),
+          linear-gradient(90deg, ${lineColor} 1px, transparent 1px)
+        `,
+        backgroundSize: '20px 20px',
+      };
+    } else if (backgroundPattern === 'lines') {
+      return {
+        backgroundColor: baseColor,
+        backgroundImage: `linear-gradient(${lineColor} 1px, transparent 1px)`,
+        backgroundSize: '20px 20px',
+      };
+    } else {
+      return {
+        backgroundColor: baseColor,
+      };
+    }
   };
   
   if (!isAuthenticated) {
@@ -959,22 +1466,22 @@ const SketchCanvas = () => {
       height: '100vh',
       display: 'flex',
       fontFamily: '"Outfit", system-ui, sans-serif',
-      backgroundColor: '#0f172a',
-      color: 'white',
+      backgroundColor: darkMode ? '#0f172a' : '#f1f5f9',
+      color: darkMode ? 'white' : '#1f2937',
       overflow: 'hidden',
     }}>
       {/* Sidebar */}
       <div style={{
         width: '280px',
-        backgroundColor: '#1e293b',
-        borderRight: '1px solid #334155',
+        backgroundColor: darkMode ? '#1e293b' : '#ffffff',
+        borderRight: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '4px 0 12px rgba(0,0,0,0.3)',
+        boxShadow: '4px 0 12px rgba(0,0,0,0.1)',
       }}>
         <div style={{
           padding: '1.5rem',
-          borderBottom: '1px solid #334155',
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
         }}>
           <h2 style={{
             fontSize: '1.5rem',
@@ -1009,10 +1516,10 @@ const SketchCanvas = () => {
               style={{
                 flex: 1,
                 padding: '0.5rem',
-                backgroundColor: '#334155',
+                backgroundColor: darkMode ? '#334155' : '#e2e8f0',
                 border: 'none',
                 borderRadius: '8px',
-                color: 'white',
+                color: darkMode ? 'white' : '#1f2937',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -1051,7 +1558,7 @@ const SketchCanvas = () => {
         
         <div style={{
           padding: '1rem',
-          borderTop: '1px solid #334155',
+          borderTop: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
           display: 'flex',
           gap: '0.5rem',
         }}>
@@ -1082,14 +1589,14 @@ const SketchCanvas = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Toolbar */}
         <div style={{
-          backgroundColor: '#1e293b',
-          borderBottom: '1px solid #334155',
+          backgroundColor: darkMode ? '#1e293b' : '#ffffff',
+          borderBottom: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
           padding: '1rem',
           display: 'flex',
           gap: '0.75rem',
           alignItems: 'center',
           flexWrap: 'wrap',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
         }}>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {[
@@ -1111,10 +1618,10 @@ const SketchCanvas = () => {
                 title={label}
                 style={{
                   padding: '0.625rem',
-                  backgroundColor: selectedTool === tool ? '#3b82f6' : '#334155',
+                  backgroundColor: selectedTool === tool ? '#3b82f6' : (darkMode ? '#334155' : '#e2e8f0'),
                   border: 'none',
                   borderRadius: '8px',
-                  color: 'white',
+                  color: selectedTool === tool ? 'white' : (darkMode ? 'white' : '#1f2937'),
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -1130,7 +1637,7 @@ const SketchCanvas = () => {
           <div style={{
             width: '1px',
             height: '30px',
-            backgroundColor: '#334155',
+            backgroundColor: darkMode ? '#334155' : '#e2e8f0',
           }} />
           
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1173,12 +1680,98 @@ const SketchCanvas = () => {
               <Type size={16} />
               To Text
             </button>
+            
+            <button
+              onClick={addAnimation}
+              title="Add Animation"
+              style={{
+                padding: '0.625rem 1rem',
+                backgroundColor: '#14b8a6',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.85rem',
+              }}
+            >
+              <Settings size={16} />
+              Animate
+            </button>
+            
+            <button
+              onClick={playAnimations}
+              disabled={isPlaying || animations.length === 0}
+              title="Play Animations"
+              style={{
+                padding: '0.625rem 1rem',
+                backgroundColor: animations.length > 0 && !isPlaying ? '#10b981' : '#64748b',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                cursor: animations.length > 0 && !isPlaying ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.85rem',
+              }}
+            >
+              <Play size={16} />
+              Play
+            </button>
           </div>
           
           <div style={{
             width: '1px',
             height: '30px',
-            backgroundColor: '#334155',
+            backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+          }} />
+          
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              title="Toggle Dark Mode"
+              style={{
+                padding: '0.625rem',
+                backgroundColor: darkMode ? '#fbbf24' : '#1f2937',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.85rem',
+              }}
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            
+            <select
+              value={backgroundPattern}
+              onChange={(e) => setBackgroundPattern(e.target.value)}
+              style={{
+                padding: '0.625rem',
+                backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+                border: 'none',
+                borderRadius: '8px',
+                color: darkMode ? 'white' : '#1f2937',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+              }}
+            >
+              <option value="grid">Grid</option>
+              <option value="lines">Lines</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          
+          <div style={{
+            width: '1px',
+            height: '30px',
+            backgroundColor: darkMode ? '#334155' : '#e2e8f0',
           }} />
           
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1187,7 +1780,7 @@ const SketchCanvas = () => {
               disabled={!currentFile}
               style={{
                 padding: '0.625rem 1rem',
-                backgroundColor: currentFile ? '#10b981' : '#475569',
+                backgroundColor: currentFile ? '#10b981' : '#64748b',
                 border: 'none',
                 borderRadius: '8px',
                 color: 'white',
@@ -1236,8 +1829,14 @@ const SketchCanvas = () => {
               Import
               <input
                 type="file"
-                accept=".json"
-                onChange={importCanvas}
+                accept=".json,.one"
+                onChange={(e) => {
+                  if (e.target.files[0]?.name.endsWith('.one')) {
+                    importOneNote(e);
+                  } else {
+                    importCanvas(e);
+                  }
+                }}
                 style={{ display: 'none' }}
               />
             </label>
@@ -1247,7 +1846,7 @@ const SketchCanvas = () => {
               disabled={!selectedObject}
               style={{
                 padding: '0.625rem 1rem',
-                backgroundColor: selectedObject ? '#ef4444' : '#475569',
+                backgroundColor: selectedObject ? '#ef4444' : '#64748b',
                 border: 'none',
                 borderRadius: '8px',
                 color: 'white',
@@ -1280,6 +1879,7 @@ const SketchCanvas = () => {
               backgroundColor: '#10b981',
               borderRadius: '8px',
               fontSize: '0.85rem',
+              color: 'white',
             }}>
               Click another shape to connect
             </div>
@@ -1291,15 +1891,10 @@ const SketchCanvas = () => {
           ref={canvasRef}
           style={{
             flex: 1,
-            backgroundColor: '#f8fafc',
             position: 'relative',
             overflow: 'hidden',
-            backgroundImage: `
-              linear-gradient(#e2e8f0 1px, transparent 1px),
-              linear-gradient(90deg, #e2e8f0 1px, transparent 1px)
-            `,
-            backgroundSize: '20px 20px',
             cursor: selectedTool === 'draw' ? 'crosshair' : selectedTool === 'select' ? 'default' : 'crosshair',
+            ...getBackgroundStyle(),
           }}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
@@ -1307,6 +1902,7 @@ const SketchCanvas = () => {
           onClick={() => {
             setSelectedObject(null);
             setConnectingFrom(null);
+            setShowTableEditor(null);
           }}
         >
           {/* Render connections */}
@@ -1370,7 +1966,7 @@ const SketchCanvas = () => {
               <polyline
                 points={drawingPath.map(p => `${p.x},${p.y}`).join(' ')}
                 fill="none"
-                stroke="#000000"
+                stroke={darkMode ? '#f1f5f9' : '#000000'}
                 strokeWidth="2"
               />
             </svg>
@@ -1386,7 +1982,7 @@ const SketchCanvas = () => {
               color: '#64748b',
             }}>
               <Edit3 size={64} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#475569' }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: darkMode ? '#94a3b8' : '#475569' }}>
                 No File Selected
               </h3>
               <p style={{ fontSize: '1rem' }}>

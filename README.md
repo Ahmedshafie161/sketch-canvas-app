@@ -135,4 +135,3 @@ MIT License - feel free to use this project for personal or commercial purposes.
 ## Support
 
 For issues or questions, please open an issue on GitHub.
-# sketch-canvas-app
