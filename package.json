@@ -1,7 +1,7 @@
 {
-  "name": "sketch-canvas-modular",
-  "version": "2.0.0",
-  "description": "A modular sketch canvas application with file management, drawing tools, and rich tables",
+  "name": "sketch-canvas-enhanced",
+  "version": "3.0.0",
+  "description": "Enhanced sketch canvas with rich editing, OCR, voice recording, and advanced table features",
   "main": "index.js",
   "scripts": {
     "start": "react-scripts start",
@@ -12,7 +12,12 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "lucide-react": "^0.263.1"
+    "lucide-react": "^0.263.1",
+    "tesseract.js": "^4.1.1",
+    "pdfjs-dist": "^3.11.174",
+    "dexie": "^3.2.4",
+    "react-quill": "^2.0.0",
+    "quill": "^1.3.7"
   },
   "devDependencies": {
     "react-scripts": "5.0.1"

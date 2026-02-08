@@ -1,6 +1,6 @@
 import React from 'react';
 import { getCommonObjectStyle, renderResizeHandles } from './canvasStyles';
-import { renderTableObject } from './tableRenderer';
+import { EnhancedTableRenderer } from './enhancedTableRenderer';
 
 export const renderCanvasObject = (
   obj,
@@ -14,7 +14,19 @@ export const renderCanvasObject = (
   handleObjectDoubleClick,
   handleCellEdit,
   handleCellMediaMenu,
-  setShowTableEditor
+  setShowTableEditor,
+  // Enhanced handlers
+  handleImageUpload,
+  handleGifUpload,
+  handleVideoUpload,
+  handleNestedTableAdd,
+  handleVoiceRecording,
+  handleMergeCells,
+  handleSplitCell,
+  handleAddRow,
+  handleAddColumn,
+  handleDeleteRow,
+  handleDeleteColumn,
 ) => {
   const isSelected = selectedObject?.id === obj.id;
   const commonStyle = getCommonObjectStyle(obj, isSelected, darkMode, canvasScale);
@@ -28,35 +40,55 @@ export const renderCanvasObject = (
     }
   };
 
+  // Add data attribute for animations
+  const enhancedCommonStyle = {
+    ...commonStyle,
+    'data-object-id': obj.id
+  };
+
   switch (obj.type) {
     case 'rectangle':
-      return renderRectangle(obj, commonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
+      return renderRectangle(obj, enhancedCommonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
     
     case 'circle':
-      return renderCircle(obj, commonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
+      return renderCircle(obj, enhancedCommonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
     
     case 'triangle':
-      return renderTriangle(obj, commonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
+      return renderTriangle(obj, enhancedCommonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
     
     case 'text':
-      return renderText(obj, commonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
+      return renderText(obj, enhancedCommonStyle, isSelected, darkMode, handleClick, handleObjectDoubleClick);
     
     case 'table':
-      return renderTableObject(
-        obj,
-        commonStyle,
-        isSelected,
-        darkMode,
-        showTableEditor,
-        handleClick,
-        handleObjectDoubleClick,
-        handleCellEdit,
-        handleCellMediaMenu,
-        setShowTableEditor
+      return (
+        <EnhancedTableRenderer
+          key={obj.id}
+          obj={obj}
+          commonStyle={enhancedCommonStyle}
+          isSelected={isSelected}
+          darkMode={darkMode}
+          showTableEditor={showTableEditor}
+          handleClick={handleClick}
+          handleObjectDoubleClick={handleObjectDoubleClick}
+          handleCellEdit={handleCellEdit}
+          handleCellMediaMenu={handleCellMediaMenu}
+          setShowTableEditor={setShowTableEditor}
+          handleImageUpload={handleImageUpload}
+          handleGifUpload={handleGifUpload}
+          handleVideoUpload={handleVideoUpload}
+          handleNestedTableAdd={handleNestedTableAdd}
+          handleVoiceRecording={handleVoiceRecording}
+          handleMergeCells={handleMergeCells}
+          handleSplitCell={handleSplitCell}
+          handleAddRow={handleAddRow}
+          handleAddColumn={handleAddColumn}
+          handleDeleteRow={handleDeleteRow}
+          handleDeleteColumn={handleDeleteColumn}
+        />
       );
     
     case 'drawing':
-      return renderDrawing(obj, commonStyle, isSelected, darkMode, handleClick);
+      return renderDrawing(obj, enhancedCommonStyle, isSelected, darkMode, handleClick);
     
     default:
       return null;
@@ -67,6 +99,7 @@ const renderRectangle = (obj, commonStyle, isSelected, darkMode, handleClick, ha
   return (
     <div
       key={obj.id}
+      data-object-id={obj.id}
       style={{
         ...commonStyle,
         backgroundColor: obj.backgroundColor || (darkMode ? '#334155' : '#e2e8f0'),
@@ -115,6 +148,7 @@ const renderCircle = (obj, commonStyle, isSelected, darkMode, handleClick, handl
   return (
     <div
       key={obj.id}
+      data-object-id={obj.id}
       style={{
         ...commonStyle,
         borderRadius: '50%',
@@ -146,6 +180,7 @@ const renderTriangle = (obj, commonStyle, isSelected, darkMode, handleClick, han
   return (
     <div
       key={obj.id}
+      data-object-id={obj.id}
       style={{
         ...commonStyle,
         backgroundColor: 'transparent',
@@ -182,6 +217,7 @@ const renderText = (obj, commonStyle, isSelected, darkMode, handleClick, handleO
   return (
     <div
       key={obj.id}
+      data-object-id={obj.id}
       style={{
         ...commonStyle,
         backgroundColor: obj.backgroundColor || 'transparent',
@@ -204,6 +240,7 @@ const renderDrawing = (obj, commonStyle, isSelected, darkMode, handleClick) => {
   return (
     <svg
       key={obj.id}
+      data-object-id={obj.id}
       style={{
         ...commonStyle,
         border: isSelected ? '2px dashed #3b82f6' : 'none',

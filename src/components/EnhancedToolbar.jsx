@@ -1,28 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Move, Square, Circle, Triangle, Type, Pencil, Table, Link,
-  Save, Download, Upload, Trash2, Moon, Sun
+  Save, Download, Upload, Trash2, Moon, Sun, Play, Pause,
+  Zap, Clock, Cloud, CloudOff
 } from 'lucide-react';
 
-const Toolbar = ({
+const EnhancedToolbar = ({
   selectedTool,
   selectedObject,
   currentFile,
   connectingFrom,
   darkMode,
   backgroundPattern,
+  syncEnabled,
+  animations,
   setSelectedTool,
   setDarkMode,
   setBackgroundPattern,
   saveCurrentFile,
   exportCanvas,
   importCanvas,
-  importOneNote,
+  importPDF,
   deleteSelected,
   convertDrawingToText,
   convertDrawingToShape,
+  addAnimation,
+  removeAnimation,
+  playAnimations,
+  enableCloudSync,
+  syncFromCloud,
 }) => {
-  
+  const [showAnimationPanel, setShowAnimationPanel] = useState(false);
+  const [animationType, setAnimationType] = useState('fade');
+  const [animationDuration, setAnimationDuration] = useState(1000);
+
   const tools = [
     { tool: 'select', icon: Move, label: 'Select' },
     { tool: 'rectangle', icon: Square, label: 'Rectangle' },
@@ -33,6 +44,15 @@ const Toolbar = ({
     { tool: 'table', icon: Table, label: 'Table' },
     { tool: 'connect', icon: Link, label: 'Connect' },
   ];
+
+  const handleAddAnimation = () => {
+    if (selectedObject) {
+      addAnimation(selectedObject.id, animationType, animationDuration);
+      alert(`Animation added to ${selectedObject.type}`);
+    } else {
+      alert('Please select an object first');
+    }
+  };
 
   return (
     <div style={{
@@ -98,7 +118,7 @@ const Toolbar = ({
               }}
             >
               <Type size={16} />
-              Convert to Text
+              OCR to Text
             </button>
 
             <button
@@ -117,10 +137,163 @@ const Toolbar = ({
               }}
             >
               <Square size={16} />
-              Convert to Shape
+              To Shape
             </button>
           </div>
         </>
+      )}
+
+      <div style={{
+        width: '1px',
+        height: '30px',
+        backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+      }} />
+
+      {/* Animation Controls */}
+      <button
+        onClick={() => setShowAnimationPanel(!showAnimationPanel)}
+        style={{
+          padding: '0.625rem 1rem',
+          backgroundColor: showAnimationPanel ? '#f59e0b' : (darkMode ? '#334155' : '#e2e8f0'),
+          border: 'none',
+          borderRadius: '8px',
+          color: showAnimationPanel ? 'white' : (darkMode ? '#f1f5f9' : '#1e293b'),
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.85rem',
+        }}
+        title="Animation Controls"
+      >
+        <Zap size={16} />
+        Animations
+      </button>
+
+      {showAnimationPanel && (
+        <div style={{
+          position: 'absolute',
+          top: '70px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: darkMode ? '#1e293b' : 'white',
+          padding: '1rem',
+          borderRadius: '12px',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+          border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+          zIndex: 100,
+          minWidth: '400px',
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: darkMode ? '#f1f5f9' : '#1e293b' }}>
+            Animation Settings
+          </h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div>
+              <label style={{ fontSize: '0.85rem', color: darkMode ? '#94a3b8' : '#64748b' }}>
+                Animation Type:
+              </label>
+              <select
+                value={animationType}
+                onChange={(e) => setAnimationType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginTop: '0.25rem',
+                  backgroundColor: darkMode ? '#334155' : '#f8fafc',
+                  border: `1px solid ${darkMode ? '#475569' : '#cbd5e1'}`,
+                  borderRadius: '6px',
+                  color: darkMode ? '#f1f5f9' : '#1e293b',
+                }}
+              >
+                <option value="fade">Fade In/Out</option>
+                <option value="slide">Slide</option>
+                <option value="rotate">Rotate</option>
+                <option value="scale">Scale</option>
+                <option value="bounce">Bounce</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.85rem', color: darkMode ? '#94a3b8' : '#64748b' }}>
+                Duration (ms):
+              </label>
+              <input
+                type="number"
+                value={animationDuration}
+                onChange={(e) => setAnimationDuration(parseInt(e.target.value))}
+                min="100"
+                max="5000"
+                step="100"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginTop: '0.25rem',
+                  backgroundColor: darkMode ? '#334155' : '#f8fafc',
+                  border: `1px solid ${darkMode ? '#475569' : '#cbd5e1'}`,
+                  borderRadius: '6px',
+                  color: darkMode ? '#f1f5f9' : '#1e293b',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={handleAddAnimation}
+                disabled={!selectedObject}
+                style={{
+                  flex: 1,
+                  padding: '0.625rem',
+                  backgroundColor: selectedObject ? '#3b82f6' : '#64748b',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: 'white',
+                  cursor: selectedObject ? 'pointer' : 'not-allowed',
+                  fontSize: '0.85rem',
+                }}
+              >
+                Add to Selected
+              </button>
+
+              <button
+                onClick={playAnimations}
+                disabled={animations.length === 0}
+                style={{
+                  flex: 1,
+                  padding: '0.625rem',
+                  backgroundColor: animations.length > 0 ? '#22c55e' : '#64748b',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: 'white',
+                  cursor: animations.length > 0 ? 'pointer' : 'not-allowed',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <Play size={14} />
+                Play All ({animations.length})
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowAnimationPanel(false)}
+              style={{
+                padding: '0.5rem',
+                backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+                border: 'none',
+                borderRadius: '6px',
+                color: darkMode ? '#f1f5f9' : '#1e293b',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       <div style={{
@@ -168,6 +341,55 @@ const Toolbar = ({
           <option value="none">None</option>
         </select>
       </div>
+
+      <div style={{
+        width: '1px',
+        height: '30px',
+        backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+      }} />
+
+      {/* Cloud Sync */}
+      <button
+        onClick={() => enableCloudSync(!syncEnabled)}
+        style={{
+          padding: '0.625rem 1rem',
+          backgroundColor: syncEnabled ? '#22c55e' : '#64748b',
+          border: 'none',
+          borderRadius: '8px',
+          color: 'white',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.85rem',
+        }}
+        title={syncEnabled ? 'Cloud Sync Enabled' : 'Enable Cloud Sync'}
+      >
+        {syncEnabled ? <Cloud size={16} /> : <CloudOff size={16} />}
+        {syncEnabled ? 'Synced' : 'Offline'}
+      </button>
+
+      {syncEnabled && (
+        <button
+          onClick={syncFromCloud}
+          style={{
+            padding: '0.625rem 1rem',
+            backgroundColor: '#06b6d4',
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.85rem',
+          }}
+          title="Sync from Cloud"
+        >
+          <Download size={16} />
+          Pull
+        </button>
+      )}
 
       <div style={{
         width: '1px',
@@ -230,13 +452,10 @@ const Toolbar = ({
           Import
           <input
             type="file"
-            accept=".json,.one,.txt,.html,.htm,.mht"
+            accept=".json,.pdf,.one,.txt,.html,.htm,.mht"
             onChange={(e) => {
-              if (e.target.files[0]?.name.endsWith('.one') ||
-                  e.target.files[0]?.name.endsWith('.html') ||
-                  e.target.files[0]?.name.endsWith('.htm') ||
-                  e.target.files[0]?.name.endsWith('.mht')) {
-                importOneNote(e);
+              if (e.target.files[0]?.name.endsWith('.pdf')) {
+                importPDF(e);
               } else {
                 importCanvas(e);
               }
@@ -292,4 +511,4 @@ const Toolbar = ({
   );
 };
 
-export default Toolbar;
+export default EnhancedToolbar;
